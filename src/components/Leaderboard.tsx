@@ -44,7 +44,14 @@ export default function Leaderboard({ players, myPlayerId, onToggleTrack, tracke
             }}
           >
             <span style={{ color: ZONE_TEXT[p.zone], fontWeight: 700 }}>{p.rank}</span>
-            <span style={{ color: isMe ? 'white' : ZONE_TEXT[p.zone], fontWeight: isMe ? 700 : 400 }}>
+            <span style={{
+              color: isMe ? 'white' : ZONE_TEXT[p.zone],
+              fontWeight: isMe ? 700 : 400,
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>
               {p.alias}{isMe ? ' (you)' : ''}
             </span>
             <span style={{ textAlign: 'right', color: ZONE_TEXT[p.zone] }}>
