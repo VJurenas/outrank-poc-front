@@ -14,6 +14,7 @@ async function json<T>(url: string, init?: RequestInit): Promise<T> {
 
 export type GameInfo = {
   id: string
+  slug: string
   asset: string
   mode: '15min' | '60min'
   kickoff_at: string
