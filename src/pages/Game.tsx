@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useLocation, useNavigate } from 'react-router-dom'
+import { useParams, useLocation } from 'react-router-dom'
 import { api, type GameInfo, type LeaderboardEntry } from '../lib/api.ts'
 import { useGameWs } from '../hooks/useGameWs.ts'
 import PriceChart from '../components/PriceChart.tsx'
@@ -10,7 +10,6 @@ type Session = { playerId: string; sessionToken: string; alias: string }
 export default function Game() {
   const { id } = useParams<{ id: string }>()
   const location = useLocation()
-  const navigate = useNavigate()
 
   const session: Session | null = (location.state as { session?: Session })?.session
     ?? JSON.parse(localStorage.getItem(`session-${id}`) ?? 'null')
@@ -63,7 +62,12 @@ export default function Game() {
   }
 
   const myEntry = leaderboard.find(p => p.player_id === session?.playerId)
-  const myPredictions = game ? buildPredictionLabels(game.mode) : []
+
+  // Load my predictions from localStorage (saved by Lobby on submit)
+  const myPredictions: { label: string; price: number }[] = id
+    ? (JSON.parse(localStorage.getItem(`predictions-${id}`) ?? '[]') as { intervalLabel: string; predictedPrice: number }[])
+        .map(p => ({ label: p.intervalLabel, price: p.predictedPrice }))
+    : []
 
   if (!game) return <div style={{ padding: 32, color: 'var(--muted)' }}>Loading…</div>
 
@@ -83,10 +87,7 @@ export default function Game() {
         <PriceChart
           asset={game.asset}
           latestPrice={latestPrice}
-          predictions={myEntry ? myPredictions.map(label => ({
-            label,
-            price: getPredictedPrice(leaderboard, session?.playerId, label),
-          })).filter(p => p.price > 0) : []}
+          predictions={myPredictions}
           height={360}
         />
 
@@ -137,14 +138,6 @@ export default function Game() {
   )
 }
 
-function buildPredictionLabels(mode: '15min' | '60min') {
-  return mode === '15min' ? ['T+15'] : ['T+15', 'T+30', 'T+45', 'T+60']
-}
-
-// placeholder — in a full implementation the lobby would pass predictions through state
-function getPredictedPrice(_players: LeaderboardEntry[], _playerId?: string, _label?: string): number {
-  return 0
-}
 
 function playZoneSound(zone: string) {
   try {

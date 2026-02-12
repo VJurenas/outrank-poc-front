@@ -2,8 +2,8 @@ const BASE = '/api'
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(BASE + url, {
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
     ...init,
+    headers: { 'Content-Type': 'application/json', ...init?.headers },
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
@@ -29,6 +29,8 @@ export type LeaderboardEntry = {
 }
 
 export const api = {
+  getPrices: () => json<Record<string, number | null>>('/prices'),
+
   getGame: (id: string) => json<GameInfo>(`/games/${id}`),
 
   joinGame: (id: string, alias: string) =>
@@ -48,6 +50,9 @@ export const api = {
       headers: { 'x-player-id': playerId, 'x-session-token': token },
       body: JSON.stringify({ predictions }),
     }),
+
+  getPredictions: (id: string) =>
+    json<{ alias: string; interval_label: string; predicted_price: number }[]>(`/games/${id}/predictions`),
 
   getLeaderboard: (id: string) => json<LeaderboardEntry[]>(`/games/${id}/leaderboard`),
 }

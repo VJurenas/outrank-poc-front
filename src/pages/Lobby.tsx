@@ -1,19 +1,21 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api, type GameInfo } from '../lib/api.ts'
 
 type Session = { playerId: string; sessionToken: string; alias: string }
 type Prediction = { intervalLabel: string; predictedPrice: number }
 
-function useCountdown(target?: Date) {
+function useCountdown(target: Date | undefined) {
   const [remaining, setRemaining] = useState(0)
+  // Stable ms value so the effect doesn't re-run on every render
+  const targetMs = target?.getTime()
   useEffect(() => {
-    if (!target) return
-    const tick = () => setRemaining(Math.max(0, target.getTime() - Date.now()))
+    if (!targetMs) return
+    const tick = () => setRemaining(Math.max(0, targetMs - Date.now()))
     tick()
     const id = setInterval(tick, 500)
     return () => clearInterval(id)
-  }, [target])
+  }, [targetMs])
   return remaining
 }
 
@@ -35,13 +37,21 @@ export default function Lobby() {
   })
   const [alias, setAlias] = useState('')
   const [predictions, setPredictions] = useState<Record<string, string>>({})
-  const [submitted, setSubmitted] = useState(false)
+  const [submitted, setSubmitted] = useState(() =>
+    !!localStorage.getItem(`predictions-${id}`)
+  )
+  const [livePrice, setLivePrice] = useState<number | null>(null)
+  const [allPredictions, setAllPredictions] = useState<{ alias: string; interval_label: string; predicted_price: number }[]>([])
   const [joining, setJoining] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
-  const kickoffDate = game ? new Date(game.kickoff_at) : undefined
+  const kickoffDate = useMemo(
+    () => game ? new Date(game.kickoff_at) : undefined,
+    [game?.kickoff_at]  // eslint-disable-line react-hooks/exhaustive-deps
+  )
   const remaining = useCountdown(kickoffDate)
 
+  // Fetch game once on mount
   useEffect(() => {
     if (!id) return
     api.getGame(id)
@@ -49,21 +59,41 @@ export default function Lobby() {
       .catch(() => setError('Game not found'))
   }, [id])
 
-  // Redirect to live view when game starts
+  // Redirect to live view when game starts — only depends on status + id
+  const gameStatus = game?.status
   useEffect(() => {
-    if (game?.status === 'live' || game?.status === 'ended') {
-      navigate(`/game/${id}/live`, { state: { session, game } })
+    if (gameStatus === 'live' || gameStatus === 'ended') {
+      navigate(`/game/${id}/live`)
     }
-  }, [game?.status, id, navigate, session, game])
+  }, [gameStatus, id, navigate])
 
-  // Poll for game status change
+  // Poll for status change — only restart when status changes, not on every setGame
   useEffect(() => {
-    if (!id || !game || game.status !== 'lobby') return
+    if (!id || gameStatus !== 'lobby') return
     const interval = setInterval(() =>
       api.getGame(id).then(setGame).catch(() => {}), 3000
     )
     return () => clearInterval(interval)
-  }, [id, game])
+  }, [id, gameStatus])
+
+  // Poll live price every 3s
+  useEffect(() => {
+    if (!game) return
+    const fetchPrice = () =>
+      api.getPrices().then(p => setLivePrice(p[game.asset] ?? null)).catch(() => {})
+    fetchPrice()
+    const interval = setInterval(fetchPrice, 3000)
+    return () => clearInterval(interval)
+  }, [game?.asset]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Poll predictions table every 5s (visible to all in lobby)
+  useEffect(() => {
+    if (!id || gameStatus !== 'lobby') return
+    const fetch = () => api.getPredictions(id).then(setAllPredictions).catch(() => {})
+    fetch()
+    const interval = setInterval(fetch, 5000)
+    return () => clearInterval(interval)
+  }, [id, gameStatus])
 
   const intervals = game?.mode === '15min' ? ['T+15'] : ['T+15', 'T+30', 'T+45', 'T+60']
 
@@ -95,6 +125,8 @@ export default function Lobby() {
     setSubmitting(true)
     try {
       await api.submitPredictions(id, session.playerId, session.sessionToken, preds)
+      // Persist locally so Game.tsx can draw prediction lines
+      localStorage.setItem(`predictions-${id}`, JSON.stringify(preds))
       setSubmitted(true)
       setError('')
     } catch (e) {
@@ -105,13 +137,18 @@ export default function Lobby() {
   }
 
   if (error && !game) return <div style={{ padding: 32, color: '#f66' }}>{error}</div>
-  if (!game) return <div style={{ padding: 32, color: 'var(--muted)' }}>Loading...</div>
+  if (!game) return <div style={{ padding: 32 }}>Loading…</div>
 
   return (
     <div style={{ maxWidth: 480, margin: '40px auto', padding: '0 16px' }}>
       <h1 style={{ fontSize: 24, marginBottom: 4 }}>outrank.xyz</h1>
-      <div style={{ color: 'var(--muted)', marginBottom: 24 }}>
-        {game.asset} / USD — {game.mode === '15min' ? '15-Minute Market' : '60-Minute Market'}
+      <div style={{ color: 'var(--muted)', marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <span>{game.asset} / USD — {game.mode === '15min' ? '15-Minute Market' : '60-Minute Market'}</span>
+        {livePrice !== null && (
+          <span style={{ color: 'white', fontSize: 18, fontWeight: 700 }}>
+            ${livePrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          </span>
+        )}
       </div>
 
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 20, marginBottom: 24 }}>
@@ -144,6 +181,7 @@ export default function Lobby() {
         <div>
           <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 8 }}>
             Enter your price prediction(s) for {game.asset}
+            {livePrice !== null && <span style={{ color: '#4af' }}> · now ${livePrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>}
           </div>
           {intervals.map(label => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -165,9 +203,37 @@ export default function Lobby() {
       )}
 
       {session && submitted && (
-        <div style={{ background: '#0a2a0a', border: '1px solid #2a5a2a', borderRadius: 8, padding: 16, textAlign: 'center' }}>
-          <div style={{ color: '#4f4', marginBottom: 4 }}>Predictions locked in!</div>
-          <div style={{ color: 'var(--muted)', fontSize: 12 }}>Waiting for kickoff…</div>
+        <div style={{ background: '#0a2a0a', border: '1px solid #2a5a2a', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+          <div style={{ color: '#4f4', marginBottom: 8 }}>Predictions locked in!</div>
+          {intervals.map(label => {
+            const stored = (JSON.parse(localStorage.getItem(`predictions-${id}`) ?? '[]') as Prediction[])
+              .find(p => p.intervalLabel === label)
+            return stored ? (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', fontSize: 13, marginBottom: 4 }}>
+                <span>{label}</span>
+                <span style={{ color: 'white' }}>${stored.predictedPrice.toLocaleString()}</span>
+              </div>
+            ) : null
+          })}
+          <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 8 }}>Waiting for kickoff…</div>
+        </div>
+      )}
+
+      {allPredictions.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 6 }}>
+            Players locked in ({new Set(allPredictions.map(p => p.alias)).size})
+          </div>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
+            {Array.from(new Set(allPredictions.map(p => p.alias))).map(alias => (
+              <div key={alias} style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
+                <span>{alias}</span>
+                <span style={{ color: 'var(--muted)', fontSize: 12 }}>
+                  {allPredictions.filter(p => p.alias === alias).map(p => `${p.interval_label}: $${p.predicted_price.toLocaleString()}`).join(' · ')}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
