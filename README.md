@@ -1,2 +1,9 @@
-# outrank-poc-front
-Outrank PoC Frontend
+# Outrank PoC Frontend
+
+## Starting development environment
+
+Then start frontend:
+
+```shell
+$ npm run dev
+```
