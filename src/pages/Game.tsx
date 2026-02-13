@@ -36,7 +36,7 @@ export default function Game() {
 
       // Zone change sound (if zone changed for current player)
       if (session) {
-        const me = players.find(p => p.player_id === session.playerId)
+        const me = players.find(p => p.playerId === session.playerId)
         if (me && me.zone !== prevZone.current) {
           prevZone.current = me.zone
           playZoneSound(me.zone)
@@ -61,7 +61,7 @@ export default function Game() {
     })
   }
 
-  const myEntry = leaderboard.find(p => p.player_id === session?.playerId)
+  const myEntry = leaderboard.find(p => p.playerId === session?.playerId)
 
   // Load my predictions from localStorage (saved by Lobby on submit)
   const myPredictions: { label: string; price: number }[] = id

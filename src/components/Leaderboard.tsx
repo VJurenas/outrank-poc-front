@@ -25,12 +25,12 @@ export default function Leaderboard({ players, myPlayerId, onToggleTrack, tracke
         <span>#</span><span>Player</span><span style={{ textAlign: 'right' }}>Distance</span><span style={{ textAlign: 'center' }}>Zone</span>
       </div>
       {players.map((p) => {
-        const isMe = p.player_id === myPlayerId
-        const isTracked = tracked?.has(p.player_id)
+        const isMe = p.playerId === myPlayerId
+        const isTracked = tracked?.has(p.playerId)
         return (
           <div
-            key={p.player_id}
-            onClick={() => onToggleTrack?.(p.player_id)}
+            key={p.playerId}
+            onClick={() => onToggleTrack?.(p.playerId)}
             style={{
               display: 'grid',
               gridTemplateColumns: '32px 1fr 100px 60px',

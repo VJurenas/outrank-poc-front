@@ -26,7 +26,7 @@ export type GameInfo = {
 
 export type LeaderboardEntry = {
   rank: number
-  player_id: string
+  playerId: string
   alias: string
   distance: number
   zone: 'gold' | 'silver' | 'dead'
