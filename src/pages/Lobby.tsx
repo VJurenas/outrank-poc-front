@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api, type GameInfo } from '../lib/api.ts'
+import { useAuth } from '../contexts/AuthContext.tsx'
 
 type Session = { playerId: string; sessionToken: string; alias: string }
 type Prediction = { intervalLabel: string; predictedPrice: number }
 
 function useCountdown(target: Date | undefined) {
   const [remaining, setRemaining] = useState(0)
-  // Stable ms value so the effect doesn't re-run on every render
   const targetMs = target?.getTime()
   useEffect(() => {
     if (!targetMs) return
@@ -29,13 +29,13 @@ function formatMs(ms: number) {
 export default function Lobby() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { user, openSignIn } = useAuth()
 
   const [game, setGame] = useState<GameInfo | null>(null)
   const [error, setError] = useState('')
   const [session, setSession] = useState<Session | null>(() => {
     try { return JSON.parse(localStorage.getItem(`session-${id}`) ?? 'null') } catch { return null }
   })
-  const [alias, setAlias] = useState('')
   const [predictions, setPredictions] = useState<Record<string, string>>({})
   const [submitted, setSubmitted] = useState(() =>
     !!localStorage.getItem(`predictions-${id}`)
@@ -59,7 +59,7 @@ export default function Lobby() {
       .catch(() => setError('Game not found'))
   }, [id])
 
-  // Redirect to live view when game starts — only depends on status + id
+  // Redirect to live view when game starts
   const gameStatus = game?.status
   useEffect(() => {
     if (gameStatus === 'live' || gameStatus === 'ended') {
@@ -67,7 +67,7 @@ export default function Lobby() {
     }
   }, [gameStatus, id, navigate])
 
-  // Poll for status change — only restart when status changes, not on every setGame
+  // Poll for status change
   useEffect(() => {
     if (!id || gameStatus !== 'lobby') return
     const interval = setInterval(() =>
@@ -86,7 +86,7 @@ export default function Lobby() {
     return () => clearInterval(interval)
   }, [game?.asset]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Poll predictions table every 5s (visible to all in lobby)
+  // Poll predictions table every 5s
   useEffect(() => {
     if (!id || gameStatus !== 'lobby') return
     const fetch = () => api.getPredictions(id).then(setAllPredictions).catch(() => {})
@@ -95,14 +95,21 @@ export default function Lobby() {
     return () => clearInterval(interval)
   }, [id, gameStatus])
 
+  // Auto-join when user signs in and we have a game
+  useEffect(() => {
+    if (user && game && game.status === 'lobby' && !session) {
+      handleJoin()
+    }
+  }, [user?.sessionToken, game?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const intervals = game?.mode === '15min' ? ['T+15'] : ['T+15', 'T+30', 'T+45', 'T+60']
 
-  async function join() {
-    if (!id || !alias.trim()) return
+  async function handleJoin() {
+    if (!id || !user) return
     setJoining(true)
     try {
-      const result = await api.joinGame(id, alias.trim())
-      const s = { ...result, alias: alias.trim() }
+      const result = await api.joinGame(id, user.sessionToken)
+      const s = { ...result, alias: user.alias }
       setSession(s)
       localStorage.setItem(`session-${id}`, JSON.stringify(s))
     } catch (e) {
@@ -125,7 +132,6 @@ export default function Lobby() {
     setSubmitting(true)
     try {
       await api.submitPredictions(id, session.playerId, session.sessionToken, preds)
-      // Persist locally so Game.tsx can draw prediction lines
       localStorage.setItem(`predictions-${id}`, JSON.stringify(preds))
       setSubmitted(true)
       setError('')
@@ -140,17 +146,20 @@ export default function Lobby() {
   if (!game) return <div style={{ padding: 32 }}>Loading…</div>
 
   return (
-    <div style={{ maxWidth: 480, margin: '40px auto', padding: '0 16px' }}>
-      <h1 style={{ fontSize: 24, marginBottom: 4 }}>outrank.xyz</h1>
+    <div style={{ maxWidth: 480, margin: '0 auto' }}>
+      <h1 style={{ fontSize: 22, marginBottom: 4 }}>
+        {game.asset} / USD — {game.mode === '15min' ? '15-Minute Market' : '60-Minute Market'}
+      </h1>
       <div style={{ color: 'var(--muted)', marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <span>{game.asset} / USD — {game.mode === '15min' ? '15-Minute Market' : '60-Minute Market'}</span>
+        <span>Lobby</span>
         {livePrice !== null && (
-          <span style={{ color: 'white', fontSize: 18, fontWeight: 700 }}>
+          <span style={{ color: 'white', fontSize: 20, fontWeight: 700 }}>
             ${livePrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}
           </span>
         )}
       </div>
 
+      {/* Countdown */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 20, marginBottom: 24 }}>
         <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 4 }}>Kickoff in</div>
         <div style={{ fontSize: 40, fontWeight: 700, letterSpacing: 2, color: remaining < 30000 ? '#f66' : 'white' }}>
@@ -158,27 +167,33 @@ export default function Lobby() {
         </div>
       </div>
 
-      {!session ? (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-          <input
-            placeholder="Enter alias"
-            value={alias}
-            onChange={e => setAlias(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && join()}
-            style={{ flex: 1 }}
-          />
-          <button onClick={join} disabled={joining || !alias.trim()}>
-            {joining ? 'Joining…' : 'Join'}
-          </button>
+      {/* Auth / Join state */}
+      {!user && (
+        <div style={{
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 8, padding: 20, marginBottom: 24,
+          textAlign: 'center',
+        }}>
+          <p style={{ color: 'var(--muted)', marginBottom: 12 }}>Sign in with your wallet to join this game.</p>
+          <button onClick={openSignIn}>Sign In with Wallet</button>
         </div>
-      ) : (
+      )}
+
+      {user && !session && (
         <div style={{ color: 'var(--muted)', marginBottom: 16 }}>
-          Playing as <strong style={{ color: 'white' }}>{session.alias}</strong>
+          {joining ? 'Joining game…' : (
+            <span>
+              Joining as <strong style={{ color: 'white' }}>{user.alias}</strong>…
+            </span>
+          )}
         </div>
       )}
 
       {session && !submitted && (
         <div>
+          <div style={{ color: 'var(--muted)', marginBottom: 16 }}>
+            Playing as <strong style={{ color: 'white' }}>{session.alias}</strong>
+          </div>
           <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 8 }}>
             Enter your price prediction(s) for {game.asset}
             {livePrice !== null && <span style={{ color: '#4af' }}> · now ${livePrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>}
@@ -220,16 +235,16 @@ export default function Lobby() {
       )}
 
       {allPredictions.length > 0 && (
-        <div style={{ marginTop: 8 }}>
+        <div style={{ marginTop: 16 }}>
           <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 6 }}>
             Players locked in ({new Set(allPredictions.map(p => p.alias)).size})
           </div>
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
-            {Array.from(new Set(allPredictions.map(p => p.alias))).map(alias => (
-              <div key={alias} style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
-                <span>{alias}</span>
+            {Array.from(new Set(allPredictions.map(p => p.alias))).map(a => (
+              <div key={a} style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
+                <span>{a}</span>
                 <span style={{ color: 'var(--muted)', fontSize: 12 }}>
-                  {allPredictions.filter(p => p.alias === alias).map(p => `${p.interval_label}: $${p.predicted_price.toLocaleString()}`).join(' · ')}
+                  {allPredictions.filter(p => p.alias === a).map(p => `${p.interval_label}: $${p.predicted_price.toLocaleString()}`).join(' · ')}
                 </span>
               </div>
             ))}
