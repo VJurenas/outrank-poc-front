@@ -44,6 +44,30 @@ export function apiSignOut(token: string): Promise<{ ok: boolean }> {
   return json('/auth/signout', { method: 'POST', headers: { 'x-user-token': token } })
 }
 
+export type PerformanceSummary = {
+  gamesPlayed: number
+  goldCount: number
+  silverCount: number
+  deadCount: number
+  bestRank: number | null
+  avgRank: number | null
+}
+
+export type PerformanceGame = {
+  slug: string
+  asset: string
+  mode: string
+  kickoff_at: string
+  rank: number
+  totalPlayers: number
+  zone: 'gold' | 'silver' | 'dead'
+  totalDistance: number
+}
+
+export function getPerformance(token: string): Promise<{ summary: PerformanceSummary; games: PerformanceGame[] }> {
+  return json('/auth/performance', { headers: { 'x-user-token': token } })
+}
+
 export function updateProfile(token: string, alias: string): Promise<{ alias: string }> {
   return json('/auth/profile', {
     method: 'PUT',

@@ -9,6 +9,7 @@ import Leaderboard from './pages/Leaderboard.tsx'
 import Community from './pages/Community.tsx'
 import Help from './pages/Help.tsx'
 import Profile from './pages/Profile.tsx'
+import Performance from './pages/Performance.tsx'
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/community" element={<Community />} />
           <Route path="/help" element={<Help />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/performance" element={<Performance />} />
           <Route path="/game/:id" element={<Lobby />} />
           <Route path="/game/:id/live" element={<Game />} />
         </Routes>
