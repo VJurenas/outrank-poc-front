@@ -8,6 +8,20 @@ const ASSET_COLORS: Record<string, string> = {
   HYPE: '#00d4ff',
 }
 
+function endTime(game: GameInfo): string {
+  const mins = game.mode === '15min' ? 15 : 60
+  return new Date(new Date(game.kickoff_at).getTime() + mins * 60_000)
+    .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function startTime(game: GameInfo): string {
+  return new Date(game.kickoff_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function isCompeting(slug: string): boolean {
+  return !!localStorage.getItem(`session-${slug}`)
+}
+
 export default function Leagues() {
   const { mode } = useParams<{ mode: string }>()
   const [games, setGames] = useState<GameInfo[]>([])
@@ -25,13 +39,16 @@ export default function Leagues() {
   }, [modeKey])
 
   const live = games.filter(g => g.status === 'live')
-  const lobby = games.filter(g => g.status === 'lobby')
+  // Sort upcoming ascending by kickoff time
+  const lobby = games
+    .filter(g => g.status === 'lobby')
+    .sort((a, b) => new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime())
 
   return (
     <div>
       <h1 style={{ margin: '0 0 6px', fontSize: 22 }}>{modeLabel} League</h1>
       <p style={{ color: 'var(--muted)', fontSize: 13, margin: '0 0 24px' }}>
-        Join upcoming games or watch live rounds.
+        Join upcoming leagues or watch live rounds.
       </p>
 
       {loading && <p style={{ color: 'var(--muted)' }}>Loading…</p>}
@@ -42,7 +59,7 @@ export default function Leagues() {
           border: '1px dashed var(--border)', borderRadius: 8,
           color: 'var(--muted)',
         }}>
-          No active games in this league. Create one via the API.
+          No active leagues in this mode.
         </div>
       )}
 
@@ -77,32 +94,39 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function GameRow({ game }: { game: GameInfo }) {
   const assetColor = ASSET_COLORS[game.asset] ?? 'var(--text)'
   const isLive = game.status === 'live'
-  const kickoff = new Date(game.kickoff_at)
+  const competing = isCompeting(game.slug)
+
+  const timeLabel = isLive
+    ? `Ends ${endTime(game)}`
+    : `Starts ${startTime(game)}`
 
   return (
     <div style={{
       background: 'var(--surface)',
-      border: '1px solid var(--border)',
+      border: `1px solid ${competing ? '#3a6a3a' : 'var(--border)'}`,
       borderRadius: 6,
       padding: '14px 16px',
-      display: 'flex', alignItems: 'center', gap: 16,
+      display: 'flex', alignItems: 'center', gap: 12,
     }}>
-      <span style={{ color: assetColor, fontWeight: 700, fontSize: 16, width: 48 }}>{game.asset}</span>
-      <span style={{ color: 'var(--muted)', fontSize: 13, flex: 1 }}>
-        {isLive
-          ? 'In progress'
-          : `Starts ${kickoff.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${kickoff.toLocaleDateString()}`
-        }
+      <span style={{ color: assetColor, fontWeight: 700, fontSize: 16, minWidth: 48 }}>{game.asset}</span>
+
+      <span style={{ color: 'var(--muted)', fontSize: 13, flex: 1 }}>{timeLabel}</span>
+
+      {competing && (
+        <span style={{ color: '#5f5', fontSize: 12 }}>competing</span>
+      )}
+
+      <span style={{ color: 'var(--muted)', fontSize: 12 }}>
+        {game.participant_count ?? 0} player{game.participant_count !== 1 ? 's' : ''}
       </span>
-      <span style={{ color: 'var(--muted)', fontSize: 12, marginRight: 8 }}>
-        {game.participant_count ?? 0} players
-      </span>
+
       {isLive ? (
         <Link
           to={`/game/${game.slug}/live`}
           style={{
             color: '#4af', fontSize: 13, textDecoration: 'none',
             padding: '4px 12px', border: '1px solid #4af', borderRadius: 4,
+            whiteSpace: 'nowrap',
           }}
         >
           Watch
@@ -111,11 +135,14 @@ function GameRow({ game }: { game: GameInfo }) {
         <Link
           to={`/game/${game.slug}`}
           style={{
-            color: 'var(--gold)', fontSize: 13, textDecoration: 'none',
-            padding: '4px 12px', border: '1px solid var(--gold)', borderRadius: 4,
+            color: competing ? 'var(--muted)' : 'var(--gold)',
+            fontSize: 13, textDecoration: 'none',
+            padding: '4px 12px',
+            border: `1px solid ${competing ? 'var(--border)' : 'var(--gold)'}`,
+            borderRadius: 4, whiteSpace: 'nowrap',
           }}
         >
-          Join
+          {competing ? 'Change' : 'Join'}
         </Link>
       )}
     </div>
