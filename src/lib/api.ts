@@ -77,7 +77,7 @@ export type GlobalLeaderboardEntry = {
   goldCount: number
   silverCount: number
   deadCount: number
-  avgDistance: number
+  avgPctDelta: number
 }
 
 export function getGlobalLeaderboard(): Promise<GlobalLeaderboardEntry[]> {

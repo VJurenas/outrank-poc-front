@@ -41,7 +41,7 @@ export default function Leaderboard() {
                 <Th style={{ textAlign: 'right', color: 'var(--gold)' }}>Gold</Th>
                 <Th style={{ textAlign: 'right', color: 'var(--silver)' }}>Silver</Th>
                 <Th style={{ textAlign: 'right', color: 'var(--dead)' }}>Dead</Th>
-                <Th style={{ textAlign: 'right' }}>Avg Δ</Th>
+                <Th style={{ textAlign: 'right' }}>Avg Δ%</Th>
               </tr>
             </thead>
             <tbody>
@@ -77,7 +77,7 @@ export default function Leaderboard() {
                     <Td style={{ textAlign: 'right', color: 'var(--silver)' }}>{row.silverCount}</Td>
                     <Td style={{ textAlign: 'right', color: 'var(--dead)' }}>{row.deadCount}</Td>
                     <Td style={{ textAlign: 'right', color: 'var(--muted)', fontFamily: 'monospace' }}>
-                      {formatDistance(row.avgDistance)}
+                      {row.avgPctDelta != null ? row.avgPctDelta.toFixed(2) + '%' : '—'}
                     </Td>
                   </tr>
                 )
@@ -102,8 +102,3 @@ function Td({ children, style }: { children?: React.ReactNode; style?: React.CSS
   )
 }
 
-function formatDistance(d: number): string {
-  if (d >= 1_000_000) return (d / 1_000_000).toFixed(2) + 'M'
-  if (d >= 1_000) return (d / 1_000).toFixed(2) + 'K'
-  return d.toFixed(2)
-}
