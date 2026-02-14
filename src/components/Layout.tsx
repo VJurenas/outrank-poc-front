@@ -17,11 +17,10 @@ export default function Layout({ children }: { children: ReactNode }) {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
         {/* Top bar */}
         <header style={{
-          height: 48, minHeight: 48,
+          height: 64, minHeight: 64,
           display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
           gap: 8,
-          padding: '0 16px',
-          borderBottom: '1px solid var(--border)',
+          padding: '0 20px',
           background: 'var(--surface)',
         }}>
           {/* Theme toggle */}

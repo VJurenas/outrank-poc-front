@@ -68,6 +68,22 @@ export function getPerformance(token: string): Promise<{ summary: PerformanceSum
   return json('/auth/performance', { headers: { 'x-user-token': token } })
 }
 
+export type GlobalLeaderboardEntry = {
+  playerId: string
+  alias: string
+  type: 'user' | 'bot'
+  score: number
+  gamesPlayed: number
+  goldCount: number
+  silverCount: number
+  deadCount: number
+  avgDistance: number
+}
+
+export function getGlobalLeaderboard(): Promise<GlobalLeaderboardEntry[]> {
+  return json('/leaderboard')
+}
+
 export function updateProfile(token: string, alias: string): Promise<{ alias: string }> {
   return json('/auth/profile', {
     method: 'PUT',

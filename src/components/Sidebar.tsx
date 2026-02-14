@@ -68,7 +68,7 @@ export default function Sidebar() {
               borderLeft: isLeagueActive && collapsed ? '3px solid var(--gold)' : '3px solid transparent',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 12, width: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: collapsed ? 0 : 12, width: '100%' }}>
               {collapsed ? <TrophyIcon size={18} /> : (
                 <>
                   <TrophyIcon size={18} />

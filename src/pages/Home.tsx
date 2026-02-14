@@ -144,7 +144,7 @@ function LeagueCard({ game, timeLabel, isLive }: { game: GameInfo; timeLabel: st
         {/* Bottom row: action link left, competing + count right */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 500 }}>
-            {isLive ? 'Watch →' : (competing ? 'Change prediction →' : 'Join →')}
+            {isLive ? 'Watch →' : (competing ? 'Change →' : 'Join →')}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {competing && <span style={{ color: 'var(--competing-text)', fontSize: 12 }}>competing</span>}
