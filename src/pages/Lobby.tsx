@@ -119,6 +119,18 @@ export default function Lobby() {
     }
   }
 
+  const STAKE_PER_PREDICTION = 100
+  const isResubmit = submitted  // true when editing a previously submitted set
+
+  function handleEditPredictions() {
+    const stored = JSON.parse(localStorage.getItem(`predictions-${id}`) ?? '[]') as Prediction[]
+    const map: Record<string, string> = {}
+    for (const p of stored) map[p.intervalLabel] = String(p.predictedPrice)
+    setPredictions(map)
+    setSubmitted(false)
+    setError('')
+  }
+
   async function submitPredictions() {
     if (!id || !session || !game) return
     const preds: Prediction[] = intervals.map(label => ({
@@ -210,16 +222,42 @@ export default function Lobby() {
               />
             </div>
           ))}
-          {error && <div style={{ color: 'var(--error)', fontSize: 12, marginBottom: 8 }}>{error}</div>}
-          <button onClick={submitPredictions} disabled={submitting} style={{ width: '100%', marginTop: 8 }}>
-            {submitting ? 'Submitting…' : 'Lock In Predictions'}
+          {/* Stake summary */}
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 6, padding: '10px 12px', marginTop: 12, fontSize: 13,
+          }}>
+            <span style={{ color: 'var(--muted)' }}>
+              {intervals.length > 1 ? `Stake · ${intervals.length} × ${STAKE_PER_PREDICTION} RANK` : 'Stake'}
+            </span>
+            <span style={{ fontWeight: 700, color: 'var(--accent)' }}>
+              {intervals.length * STAKE_PER_PREDICTION} RANK
+            </span>
+          </div>
+
+          {error && <div style={{ color: 'var(--error)', fontSize: 12, marginTop: 8 }}>{error}</div>}
+          <button onClick={submitPredictions} disabled={submitting} style={{ width: '100%', marginTop: 10 }}>
+            {submitting ? 'Submitting…' : isResubmit ? 'Update Predictions' : 'Lock In Predictions'}
           </button>
         </div>
       )}
 
       {session && submitted && (
         <div style={{ background: 'var(--success-bg)', border: '1px solid var(--success-border)', borderRadius: 8, padding: 16, marginBottom: 16 }}>
-          <div style={{ color: 'var(--success-text)', marginBottom: 8 }}>Predictions locked in!</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ color: 'var(--success-text)' }}>Predictions locked in!</span>
+            <button
+              onClick={handleEditPredictions}
+              style={{
+                fontSize: 12, padding: '3px 10px',
+                background: 'transparent', border: '1px solid var(--border)',
+                color: 'var(--muted)', cursor: 'pointer', borderRadius: 4,
+              }}
+            >
+              Edit
+            </button>
+          </div>
           {intervals.map(label => {
             const stored = (JSON.parse(localStorage.getItem(`predictions-${id}`) ?? '[]') as Prediction[])
               .find(p => p.intervalLabel === label)
@@ -230,7 +268,9 @@ export default function Lobby() {
               </div>
             ) : null
           })}
-          <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 8 }}>Waiting for kickoff…</div>
+          <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 8 }}>
+            Staked {intervals.length * STAKE_PER_PREDICTION} RANK · Waiting for kickoff…
+          </div>
         </div>
       )}
 

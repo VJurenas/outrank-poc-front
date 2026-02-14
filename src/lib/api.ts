@@ -84,6 +84,10 @@ export function getGlobalLeaderboard(): Promise<GlobalLeaderboardEntry[]> {
   return json('/leaderboard')
 }
 
+export function getBalance(token: string): Promise<{ balance: number }> {
+  return json('/auth/balance', { headers: { 'x-user-token': token } })
+}
+
 export function updateProfile(token: string, alias: string): Promise<{ alias: string }> {
   return json('/auth/profile', {
     method: 'PUT',
