@@ -7,15 +7,15 @@ type Props = {
   tracked?: Set<string>
 }
 
-const ZONE_COLORS: Record<string, string> = {
-  gold: '#2a2200',
-  silver: '#1e1e1e',
-  dead: '#111',
+const ZONE_BG: Record<string, string> = {
+  gold:   'var(--zone-gold-bg)',
+  silver: 'var(--zone-silver-bg)',
+  dead:   'var(--zone-dead-bg)',
 }
 const ZONE_TEXT: Record<string, string> = {
-  gold: '#f5c518',
-  silver: '#aaa',
-  dead: '#555',
+  gold:   'var(--gold)',
+  silver: 'var(--silver)',
+  dead:   'var(--dead)',
 }
 
 export default function Leaderboard({ players, myPlayerId, onToggleTrack, tracked }: Props) {
@@ -36,8 +36,8 @@ export default function Leaderboard({ players, myPlayerId, onToggleTrack, tracke
               gridTemplateColumns: '32px 1fr 100px 60px',
               gap: 4,
               padding: '6px 8px',
-              background: ZONE_COLORS[p.zone],
-              borderLeft: isMe ? '3px solid white' : isTracked ? '3px solid #4af' : '3px solid transparent',
+              background: ZONE_BG[p.zone],
+              borderLeft: isMe ? '3px solid var(--text)' : isTracked ? '3px solid var(--accent-2)' : '3px solid transparent',
               cursor: onToggleTrack ? 'pointer' : 'default',
               marginBottom: 2,
               borderRadius: 3,
@@ -45,7 +45,7 @@ export default function Leaderboard({ players, myPlayerId, onToggleTrack, tracke
           >
             <span style={{ color: ZONE_TEXT[p.zone], fontWeight: 700 }}>{p.rank}</span>
             <span style={{
-              color: isMe ? 'white' : ZONE_TEXT[p.zone],
+              color: isMe ? 'var(--text)' : ZONE_TEXT[p.zone],
               fontWeight: isMe ? 700 : 400,
               minWidth: 0,
               overflow: 'hidden',

@@ -1,12 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getGames, type GameInfo } from '../lib/api.ts'
-
-const ASSET_COLORS: Record<string, string> = {
-  BTC: '#f7931a',
-  ETH: '#627eea',
-  HYPE: '#00d4ff',
-}
+import { AssetIcon } from '../components/Icons.tsx'
 
 function endTime(game: GameInfo): string {
   const mins = game.mode === '15min' ? 15 : 60
@@ -92,7 +87,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function GameRow({ game }: { game: GameInfo }) {
-  const assetColor = ASSET_COLORS[game.asset] ?? 'var(--text)'
   const isLive = game.status === 'live'
   const competing = isCompeting(game.slug)
 
@@ -103,17 +97,18 @@ function GameRow({ game }: { game: GameInfo }) {
   return (
     <div style={{
       background: 'var(--surface)',
-      border: `1px solid ${competing ? '#3a6a3a' : 'var(--border)'}`,
+      border: `1px solid ${competing ? 'var(--competing-border)' : 'var(--border)'}`,
       borderRadius: 6,
       padding: '14px 16px',
       display: 'flex', alignItems: 'center', gap: 12,
     }}>
-      <span style={{ color: assetColor, fontWeight: 700, fontSize: 16, minWidth: 48 }}>{game.asset}</span>
+      <AssetIcon asset={game.asset} size={22} />
+      <span style={{ fontWeight: 700, fontSize: 15, minWidth: 48 }}>{game.asset}</span>
 
       <span style={{ color: 'var(--muted)', fontSize: 13, flex: 1 }}>{timeLabel}</span>
 
       {competing && (
-        <span style={{ color: '#5f5', fontSize: 12 }}>competing</span>
+        <span style={{ color: 'var(--competing-text)', fontSize: 12 }}>competing</span>
       )}
 
       <span style={{ color: 'var(--muted)', fontSize: 12 }}>
@@ -124,8 +119,8 @@ function GameRow({ game }: { game: GameInfo }) {
         <Link
           to={`/game/${game.slug}/live`}
           style={{
-            color: '#4af', fontSize: 13, textDecoration: 'none',
-            padding: '4px 12px', border: '1px solid #4af', borderRadius: 4,
+            color: 'var(--accent-2)', fontSize: 13, textDecoration: 'none',
+            padding: '4px 12px', border: '1px solid var(--accent-2)', borderRadius: 4,
             whiteSpace: 'nowrap',
           }}
         >
@@ -135,10 +130,10 @@ function GameRow({ game }: { game: GameInfo }) {
         <Link
           to={`/game/${game.slug}`}
           style={{
-            color: competing ? 'var(--muted)' : 'var(--gold)',
+            color: competing ? 'var(--muted)' : 'var(--accent)',
             fontSize: 13, textDecoration: 'none',
             padding: '4px 12px',
-            border: `1px solid ${competing ? 'var(--border)' : 'var(--gold)'}`,
+            border: `1px solid ${competing ? 'var(--border)' : 'var(--accent)'}`,
             borderRadius: 4, whiteSpace: 'nowrap',
           }}
         >

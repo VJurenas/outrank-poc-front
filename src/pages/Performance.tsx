@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { getPerformance, type PerformanceSummary, type PerformanceGame } from '../lib/api.ts'
+import { AssetIcon } from '../components/Icons.tsx'
 
-const ZONE_COLORS = { gold: '#f5c518', silver: '#aaa', dead: '#555' }
-const ASSET_COLORS: Record<string, string> = { BTC: '#f7931a', ETH: '#627eea', HYPE: '#00d4ff' }
+const ZONE_COLORS = { gold: 'var(--gold)', silver: 'var(--silver)', dead: 'var(--dead)' }
+const ZONE_BORDERS = { gold: 'var(--zone-gold-border)', silver: 'var(--border)', dead: 'var(--border)' }
 
 function StatCard({ label, value, color }: { label: string; value: string | number; color?: string }) {
   return (
@@ -40,7 +41,7 @@ export default function Performance() {
 
   if (!user) return null
   if (loading) return <div style={{ padding: 32, color: 'var(--muted)' }}>Loading…</div>
-  if (error) return <div style={{ padding: 32, color: '#f66' }}>{error}</div>
+  if (error) return <div style={{ padding: 32, color: 'var(--error)' }}>{error}</div>
 
   return (
     <div>
@@ -96,8 +97,8 @@ export default function Performance() {
             </div>
 
             {games.map(g => {
-              const assetColor = ASSET_COLORS[g.asset] ?? 'var(--text)'
               const zoneColor = ZONE_COLORS[g.zone]
+              const zoneBorder = ZONE_BORDERS[g.zone]
               const date = new Date(g.kickoff_at)
               const dateLabel = date.toLocaleDateString([], { month: 'short', day: 'numeric' })
               const timeLabel = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -112,12 +113,15 @@ export default function Performance() {
                     padding: '10px 12px',
                     background: 'var(--surface)',
                     border: '1px solid var(--border)',
-                    borderLeft: `3px solid ${zoneColor}`,
+                    borderLeft: `3px solid ${zoneBorder}`,
                     borderRadius: 4,
                     alignItems: 'center',
                   }}
                 >
-                  <span style={{ color: assetColor, fontWeight: 700 }}>{g.asset}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <AssetIcon asset={g.asset} size={18} />
+                    <span style={{ fontWeight: 700, fontSize: 13 }}>{g.asset}</span>
+                  </div>
                   <span style={{ color: 'var(--muted)', fontSize: 12 }}>
                     {g.mode === '15min' ? '15 min' : '1 hour'}
                   </span>

@@ -68,8 +68,8 @@ export default function Profile() {
             {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
-        {saved && <p style={{ color: '#5f5', fontSize: 12, margin: '8px 0 0' }}>Saved.</p>}
-        {error && <p style={{ color: '#f66', fontSize: 12, margin: '8px 0 0' }}>{error}</p>}
+        {saved && <p style={{ color: 'var(--success-text)', fontSize: 12, margin: '8px 0 0' }}>Saved.</p>}
+        {error && <p style={{ color: 'var(--error)', fontSize: 12, margin: '8px 0 0' }}>{error}</p>}
       </div>
 
       <button onClick={() => navigate(-1)} style={{ background: 'transparent', color: 'var(--muted)', border: '1px solid var(--border)' }}>

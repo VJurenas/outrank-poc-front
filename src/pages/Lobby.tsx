@@ -142,7 +142,7 @@ export default function Lobby() {
     }
   }
 
-  if (error && !game) return <div style={{ padding: 32, color: '#f66' }}>{error}</div>
+  if (error && !game) return <div style={{ padding: 32, color: 'var(--error)' }}>{error}</div>
   if (!game) return <div style={{ padding: 32 }}>Loading…</div>
 
   return (
@@ -153,7 +153,7 @@ export default function Lobby() {
       <div style={{ color: 'var(--muted)', marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
         <span>Lobby</span>
         {livePrice !== null && (
-          <span style={{ color: 'white', fontSize: 20, fontWeight: 700 }}>
+          <span style={{ color: 'var(--text)', fontSize: 20, fontWeight: 700 }}>
             ${livePrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}
           </span>
         )}
@@ -162,7 +162,7 @@ export default function Lobby() {
       {/* Countdown */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 20, marginBottom: 24 }}>
         <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 4 }}>Kickoff in</div>
-        <div style={{ fontSize: 40, fontWeight: 700, letterSpacing: 2, color: remaining < 30000 ? '#f66' : 'white' }}>
+        <div style={{ fontSize: 40, fontWeight: 700, letterSpacing: 2, color: remaining < 30000 ? 'var(--error)' : 'var(--text)' }}>
           {formatMs(remaining)}
         </div>
       </div>
@@ -183,7 +183,7 @@ export default function Lobby() {
         <div style={{ color: 'var(--muted)', marginBottom: 16 }}>
           {joining ? 'Joining game…' : (
             <span>
-              Joining as <strong style={{ color: 'white' }}>{user.alias}</strong>…
+              Joining as <strong style={{ color: 'var(--text)' }}>{user.alias}</strong>…
             </span>
           )}
         </div>
@@ -192,11 +192,11 @@ export default function Lobby() {
       {session && !submitted && (
         <div>
           <div style={{ color: 'var(--muted)', marginBottom: 16 }}>
-            Playing as <strong style={{ color: 'white' }}>{session.alias}</strong>
+            Playing as <strong style={{ color: 'var(--text)' }}>{session.alias}</strong>
           </div>
           <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 8 }}>
             Enter your price prediction(s) for {game.asset}
-            {livePrice !== null && <span style={{ color: '#4af' }}> · now ${livePrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>}
+            {livePrice !== null && <span style={{ color: 'var(--accent-2)' }}> · now ${livePrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>}
           </div>
           {intervals.map(label => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -210,7 +210,7 @@ export default function Lobby() {
               />
             </div>
           ))}
-          {error && <div style={{ color: '#f66', fontSize: 12, marginBottom: 8 }}>{error}</div>}
+          {error && <div style={{ color: 'var(--error)', fontSize: 12, marginBottom: 8 }}>{error}</div>}
           <button onClick={submitPredictions} disabled={submitting} style={{ width: '100%', marginTop: 8 }}>
             {submitting ? 'Submitting…' : 'Lock In Predictions'}
           </button>
@@ -218,15 +218,15 @@ export default function Lobby() {
       )}
 
       {session && submitted && (
-        <div style={{ background: '#0a2a0a', border: '1px solid #2a5a2a', borderRadius: 8, padding: 16, marginBottom: 16 }}>
-          <div style={{ color: '#4f4', marginBottom: 8 }}>Predictions locked in!</div>
+        <div style={{ background: 'var(--success-bg)', border: '1px solid var(--success-border)', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+          <div style={{ color: 'var(--success-text)', marginBottom: 8 }}>Predictions locked in!</div>
           {intervals.map(label => {
             const stored = (JSON.parse(localStorage.getItem(`predictions-${id}`) ?? '[]') as Prediction[])
               .find(p => p.intervalLabel === label)
             return stored ? (
               <div key={label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', fontSize: 13, marginBottom: 4 }}>
                 <span>{label}</span>
-                <span style={{ color: 'white' }}>${stored.predictedPrice.toLocaleString()}</span>
+                <span style={{ color: 'var(--text)' }}>${stored.predictedPrice.toLocaleString()}</span>
               </div>
             ) : null
           })}

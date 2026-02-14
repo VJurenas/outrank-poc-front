@@ -90,7 +90,7 @@ export default function WalletSignIn() {
               style={{
                 width: '100%', padding: '12px 16px',
                 display: 'flex', alignItems: 'center', gap: 12,
-                background: '#1c1c1e', border: '1px solid var(--border)',
+                background: 'var(--surface-2)', border: '1px solid var(--border)',
                 borderRadius: 6, cursor: 'pointer', color: 'var(--text)',
                 fontSize: 15, fontWeight: 600,
               }}
@@ -129,7 +129,7 @@ export default function WalletSignIn() {
               maxLength={32}
               style={{
                 width: '100%', padding: '10px 12px', marginBottom: 16,
-                background: '#111', border: '1px solid var(--border)',
+                background: 'var(--bg)', border: '1px solid var(--border)',
                 borderRadius: 4, color: 'var(--text)', fontSize: 14,
                 boxSizing: 'border-box',
               }}
@@ -152,7 +152,7 @@ export default function WalletSignIn() {
 
         {step === 'error' && (
           <>
-            <h2 style={{ margin: '0 0 12px', fontSize: 18, color: '#f66' }}>Sign-in Failed</h2>
+            <h2 style={{ margin: '0 0 12px', fontSize: 18, color: 'var(--error)' }}>Sign-in Failed</h2>
             <p style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 20 }}>{error}</p>
             <button onClick={() => setStep('select')} style={{ width: '100%', padding: '10px 0' }}>
               Try Again

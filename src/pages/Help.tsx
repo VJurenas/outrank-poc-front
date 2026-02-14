@@ -13,7 +13,7 @@ export default function Help() {
         After each checkpoint, players are ranked by how close their prediction was to the actual price:
         <ul style={{ color: 'var(--muted)', margin: '8px 0 0 0', paddingLeft: 20, lineHeight: 1.8 }}>
           <li><Gold>Gold</Gold> — top 40% closest predictions</li>
-          <li style={{ color: '#aaa' }}>Silver — next 20%</li>
+          <li style={{ color: 'var(--silver)' }}>Silver — next 20%</li>
           <li><Dead>Dead</Dead> — bottom 40%</li>
         </ul>
       </Section>

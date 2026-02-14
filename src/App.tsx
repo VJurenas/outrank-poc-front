@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext.tsx'
+import { ThemeProvider } from './contexts/ThemeContext.tsx'
 import Layout from './components/Layout.tsx'
 import Home from './pages/Home.tsx'
 import Lobby from './pages/Lobby.tsx'
@@ -13,6 +14,7 @@ import Performance from './pages/Performance.tsx'
 
 export default function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <Layout>
         <Routes>
@@ -28,5 +30,6 @@ export default function App() {
         </Routes>
       </Layout>
     </AuthProvider>
+    </ThemeProvider>
   )
 }

@@ -93,8 +93,8 @@ export default function Game() {
 
         {myEntry && (
           <div style={{
-            background: myEntry.zone === 'gold' ? '#2a2200' : myEntry.zone === 'silver' ? '#1e1e1e' : '#111',
-            border: `1px solid ${myEntry.zone === 'gold' ? '#5a4400' : 'var(--border)'}`,
+            background: myEntry.zone === 'gold' ? 'var(--zone-gold-bg)' : myEntry.zone === 'silver' ? 'var(--zone-silver-bg)' : 'var(--zone-dead-bg)',
+            border: `1px solid ${myEntry.zone === 'gold' ? 'var(--zone-gold-border)' : 'var(--border)'}`,
             borderRadius: 8,
             padding: '12px 16px',
             display: 'flex',
@@ -113,7 +113,7 @@ export default function Game() {
             <div>
               <div style={{ color: 'var(--muted)', fontSize: 11 }}>Zone</div>
               <div style={{ fontSize: 24, fontWeight: 700, textTransform: 'capitalize',
-                color: myEntry.zone === 'gold' ? '#f5c518' : myEntry.zone === 'silver' ? '#aaa' : '#555' }}>
+                color: myEntry.zone === 'gold' ? 'var(--gold)' : myEntry.zone === 'silver' ? 'var(--silver)' : 'var(--dead)' }}>
                 {myEntry.zone}
               </div>
             </div>
@@ -125,7 +125,7 @@ export default function Game() {
       <div style={{ overflow: 'auto' }}>
         <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 8 }}>
           Leaderboard · {leaderboard.length} players
-          {tracked.size > 0 && <span style={{ color: '#4af' }}> · tracking {tracked.size}</span>}
+          {tracked.size > 0 && <span style={{ color: 'var(--accent-2)' }}> · tracking {tracked.size}</span>}
         </div>
         <Leaderboard
           players={leaderboard}

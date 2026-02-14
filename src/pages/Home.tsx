@@ -2,12 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getGames, type GameInfo } from '../lib/api.ts'
 import { ASSETS } from '../lib/assets.ts'
-
-const ASSET_COLORS: Record<string, string> = {
-  BTC: '#f7931a',
-  ETH: '#627eea',
-  HYPE: '#00d4ff',
-}
+import { AssetIcon } from '../components/Icons.tsx'
 
 function endTime(game: GameInfo): string {
   const mins = game.mode === '15min' ? 15 : 60
@@ -100,7 +95,6 @@ export default function Home() {
 }
 
 function LeagueCard({ game, timeLabel, isLive }: { game: GameInfo; timeLabel: string; isLive: boolean }) {
-  const assetColor = ASSET_COLORS[game.asset] ?? 'var(--text)'
   const competing = isCompeting(game.slug)
   const to = isLive ? `/game/${game.slug}/live` : `/game/${game.slug}`
 
@@ -109,21 +103,24 @@ function LeagueCard({ game, timeLabel, isLive }: { game: GameInfo; timeLabel: st
       <div
         style={{
           background: 'var(--surface)',
-          border: `1px solid ${competing ? '#3a6a3a' : 'var(--border)'}`,
+          border: `1px solid ${competing ? 'var(--competing-border)' : 'var(--border)'}`,
           borderRadius: 8, padding: 20, cursor: 'pointer',
           transition: 'border-color 0.15s',
         }}
-        onMouseEnter={e => (e.currentTarget.style.borderColor = assetColor)}
-        onMouseLeave={e => (e.currentTarget.style.borderColor = competing ? '#3a6a3a' : 'var(--border)')}
+        onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
+        onMouseLeave={e => (e.currentTarget.style.borderColor = competing ? 'var(--competing-border)' : 'var(--border)')}
       >
-        {/* Header row: asset name + LIVE badge or mode label */}
+        {/* Header row: asset icon + name + LIVE badge or mode label */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-          <span style={{ fontSize: 22, fontWeight: 700, color: assetColor }}>{game.asset}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <AssetIcon asset={game.asset} size={24} />
+            <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>{game.asset}</span>
+          </div>
           {isLive ? (
             <span style={{
-              background: '#1e3a1e', color: '#5f5',
+              background: 'var(--live-bg)', color: 'var(--live-text)',
               fontSize: 11, fontWeight: 600, padding: '2px 8px',
-              borderRadius: 20, border: '1px solid #3a6a3a',
+              borderRadius: 20, border: '1px solid var(--live-border)',
             }}>LIVE</span>
           ) : (
             <span style={{ color: 'var(--muted)', fontSize: 12 }}>{game.mode === '15min' ? '15 min' : '1 hour'}</span>
@@ -135,9 +132,9 @@ function LeagueCard({ game, timeLabel, isLive }: { game: GameInfo; timeLabel: st
           <span style={{
             display: 'inline-block',
             fontSize: 13, fontWeight: 600,
-            color: isLive ? 'rgba(245, 197, 24, 0.5)' : 'rgba(119, 221, 221, 0.5)',
-            background: isLive ? 'rgba(245,197,24,0.08)' : 'rgba(119,221,221,0.08)',
-            border: `1px solid ${isLive ? 'rgba(245,197,24,0.3)' : 'rgba(119,221,221,0.3)'}`,
+            color: isLive ? 'var(--time-live-color)' : 'var(--time-lobby-color)',
+            background: isLive ? 'var(--time-live-bg)' : 'var(--time-lobby-bg)',
+            border: `1px solid ${isLive ? 'var(--time-live-border)' : 'var(--time-lobby-border)'}`,
             borderRadius: 4, padding: '3px 10px',
           }}>
             {timeLabel}
@@ -146,11 +143,11 @@ function LeagueCard({ game, timeLabel, isLive }: { game: GameInfo; timeLabel: st
 
         {/* Bottom row: action link left, competing + count right */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 13, color: assetColor, fontWeight: 500 }}>
+          <span style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 500 }}>
             {isLive ? 'Watch →' : (competing ? 'Change prediction →' : 'Join →')}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {competing && <span style={{ color: '#5f5', fontSize: 12 }}>competing</span>}
+            {competing && <span style={{ color: 'var(--competing-text)', fontSize: 12 }}>competing</span>}
             <span style={{ color: 'var(--muted)', fontSize: 12 }}>
               {game.participant_count ?? 0} player{game.participant_count !== 1 ? 's' : ''}
             </span>

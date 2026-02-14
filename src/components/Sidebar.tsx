@@ -120,7 +120,7 @@ function NavItem({
         textDecoration: 'none',
         color: isActive ? 'var(--text)' : 'var(--muted)',
         borderLeft: isActive ? '3px solid var(--gold)' : '3px solid transparent',
-        background: isActive ? 'rgba(245,197,24,0.06)' : 'transparent',
+        background: isActive ? 'var(--nav-active-bg)' : 'transparent',
         fontSize: 14,
       })}
       title={collapsed ? label : undefined}

@@ -1,22 +1,140 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-:root {
-  --bg: #0d0d0d;
-  --surface: #1a1a1a;
-  --border: #2a2a2a;
-  --text: #e0e0e0;
-  --muted: #666;
-  --gold: #f5c518;
-  --silver: #aaa;
-  --dead: #444;
+/* ─── Dark theme (default) ───────────────────────────────────────── */
+:root, [data-theme="dark"] {
+  /* Raw palette — change these 4 to retheme dark mode */
+  --palette-accent:   #FF6500;
+  --palette-surface:  #121212;
+  --palette-elevated: #1E3E62;
+  --palette-base:     #121212;
+
+  /* Semantic tokens */
+  --bg:        var(--palette-base);
+  --surface:   var(--palette-surface);
+  --surface-2: var(--palette-elevated);
+  --border:    var(--palette-elevated);
+  --text:      #e8e8f0;
+  --muted:     #5a7a9a;
+  --accent:    var(--palette-accent);
+  --accent-2:  #4a9eff;
+
+  /* Navigation */
+  --nav-active-bg: rgba(255, 101, 0, 0.08);
+
+  /* Zone colours (semantic — gold = best, dead = worst) */
+  --gold:              #f5c518;
+  --zone-gold-bg:      rgba(245, 197, 24, 0.10);
+  --zone-gold-border:  rgba(245, 197, 24, 0.35);
+  --silver:            #8899aa;
+  --zone-silver-bg:    #050e1a;
+  --dead:              #3a4a5a;
+  --zone-dead-bg:      var(--palette-base);
+
+  /* Live / competing indicators */
+  --live-bg:          rgba(0, 200, 80, 0.10);
+  --live-text:        #00cc55;
+  --live-border:      rgba(0, 200, 80, 0.35);
+  --competing-border: rgba(0, 200, 80, 0.40);
+  --competing-text:   #00cc55;
+
+  /* Time-label pills */
+  --time-live-color:   rgba(255, 101, 0, 0.80);
+  --time-live-bg:      rgba(255, 101, 0, 0.10);
+  --time-live-border:  rgba(255, 101, 0, 0.35);
+  --time-lobby-color:  rgba(74, 158, 255, 0.75);
+  --time-lobby-bg:     rgba(74, 158, 255, 0.10);
+  --time-lobby-border: rgba(74, 158, 255, 0.30);
+
+  /* Feedback */
+  --success-bg:     rgba(0, 200, 80, 0.10);
+  --success-text:   #00cc55;
+  --success-border: rgba(0, 200, 80, 0.35);
+  --error:          #ff5555;
+
+  /* Chart (lightweight-charts needs concrete values read at runtime) */
+  --chart-bg:     #000000;
+  --chart-grid:   #0B192C;
+  --chart-border: #1E3E62;
+  --chart-text:   #5a7a9a;
+  --chart-line:   #4a9eff;
+  --chart-pred:   #f5c518;
 }
 
+/* ─── Light theme ─────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  /* Raw palette — change these 4 to retheme light mode */
+  --palette-accent:   #FEB05D;
+  --palette-surface:  #FDFAF6;
+  --palette-elevated: #ede8e8;
+  --palette-base:     #FDFAF6;
+
+  /* Semantic tokens */
+  --bg:        var(--palette-base);
+  --surface:   var(--palette-surface);
+  --surface-2: var(--palette-elevated);
+  --border:    #d8d2d2;
+  --text:      #2B2A2A;
+  --muted:     #888888;
+  --accent:    var(--palette-accent);
+  --accent-2:  #5A7ACD;
+
+  /* Navigation */
+  --nav-active-bg: rgba(254, 176, 93, 0.14);
+
+  /* Zone colours */
+  --gold:              #c4830a;
+  --zone-gold-bg:      rgba(254, 176, 93, 0.15);
+  --zone-gold-border:  rgba(254, 176, 93, 0.50);
+  --silver:            #666666;
+  --zone-silver-bg:    #f5f2f2;
+  --dead:              #aaaaaa;
+  --zone-dead-bg:      #eee8e8;
+
+  /* Live / competing indicators */
+  --live-bg:          rgba(0, 140, 60, 0.10);
+  --live-text:        #007a30;
+  --live-border:      rgba(0, 140, 60, 0.30);
+  --competing-border: rgba(0, 140, 60, 0.40);
+  --competing-text:   #007a30;
+
+  /* Time-label pills */
+  --time-live-color:   rgba(180, 95, 10, 0.85);
+  --time-live-bg:      rgba(254, 176, 93, 0.18);
+  --time-live-border:  rgba(254, 176, 93, 0.50);
+  --time-lobby-color:  rgba(90, 122, 205, 0.85);
+  --time-lobby-bg:     rgba(90, 122, 205, 0.10);
+  --time-lobby-border: rgba(90, 122, 205, 0.35);
+
+  /* Feedback */
+  --success-bg:     rgba(0, 140, 60, 0.08);
+  --success-text:   #007a30;
+  --success-border: rgba(0, 140, 60, 0.30);
+  --error:          #cc2222;
+
+  /* Chart */
+  --chart-bg:     #ffffff;
+  --chart-grid:   #f0ecec;
+  --chart-border: #d8d2d2;
+  --chart-text:   #888888;
+  --chart-line:   #5A7ACD;
+  --chart-pred:   #c4830a;
+}
+
+/* ─── Base styles ─────────────────────────────────────────────────────────── */
 body {
   background: var(--bg);
   color: var(--text);
   font-family: system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.5;
+}
+
+/* Only animate theme transitions when the user explicitly clicks the toggle */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease !important;
 }
 
 button {
@@ -41,4 +159,4 @@ input {
   font-size: 14px;
 }
 
-input:focus { outline: 1px solid var(--silver); }
+input:focus { outline: 1px solid var(--muted); }

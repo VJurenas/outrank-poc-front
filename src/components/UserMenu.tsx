@@ -36,12 +36,12 @@ export default function UserMenu() {
         style={{
           width: 36, height: 36, borderRadius: '50%',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: user ? '#1e3a1e' : 'var(--surface)',
-          border: user ? '1px solid #3a6a3a' : '1px solid var(--border)',
+          background: user ? 'var(--live-bg)' : 'var(--surface)',
+          border: user ? '1px solid var(--live-border)' : '1px solid var(--border)',
           cursor: 'pointer', padding: 0,
         }}
       >
-        <UserIcon size={18} color={user ? '#5f5' : 'var(--muted)'} />
+        <UserIcon size={18} color={user ? 'var(--live-text)' : 'var(--muted)'} />
       </button>
 
       {open && (
