@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api, type GameInfo } from '../lib/api.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
+import PriceChart from '../components/PriceChart.tsx'
 
 type Session = { playerId: string; sessionToken: string; alias: string }
 type Prediction = { intervalLabel: string; predictedPrice: number }
@@ -104,6 +105,13 @@ export default function Lobby() {
 
   const intervals = game?.mode === '15min' ? ['T+15'] : ['T+15', 'T+30', 'T+45', 'T+60']
 
+  // Stable reference: only recompute when the stored prediction values change
+  const chartPredictions = useMemo(() => {
+    if (!submitted || !id) return []
+    return (JSON.parse(localStorage.getItem(`predictions-${id}`) ?? '[]') as { intervalLabel: string; predictedPrice: number }[])
+      .map(p => ({ label: p.intervalLabel, price: p.predictedPrice }))
+  }, [submitted, id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   async function handleJoin() {
     if (!id || !user) return
     setJoining(true)
@@ -169,6 +177,16 @@ export default function Lobby() {
             ${livePrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}
           </span>
         )}
+      </div>
+
+      {/* Price chart */}
+      <div style={{ marginBottom: 20 }}>
+        <PriceChart
+          asset={game.asset}
+          latestPrice={livePrice ?? undefined}
+          predictions={chartPredictions}
+          height={240}
+        />
       </div>
 
       {/* Countdown */}

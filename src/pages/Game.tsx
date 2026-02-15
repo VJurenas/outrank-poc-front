@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useLocation } from 'react-router-dom'
 import { api, type GameInfo, type LeaderboardEntry } from '../lib/api.ts'
 import { useGameWs } from '../hooks/useGameWs.ts'
@@ -63,11 +63,12 @@ export default function Game() {
 
   const myEntry = leaderboard.find(p => p.playerId === session?.playerId)
 
-  // Load my predictions from localStorage (saved by Lobby on submit)
-  const myPredictions: { label: string; price: number }[] = id
-    ? (JSON.parse(localStorage.getItem(`predictions-${id}`) ?? '[]') as { intervalLabel: string; predictedPrice: number }[])
-        .map(p => ({ label: p.intervalLabel, price: p.predictedPrice }))
-    : []
+  // Stable reference — predictions don't change while on the Game page
+  const myPredictions = useMemo<{ label: string; price: number }[]>(() => {
+    if (!id) return []
+    return (JSON.parse(localStorage.getItem(`predictions-${id}`) ?? '[]') as { intervalLabel: string; predictedPrice: number }[])
+      .map(p => ({ label: p.intervalLabel, price: p.predictedPrice }))
+  }, [id])
 
   if (!game) return <div style={{ padding: 32, color: 'var(--muted)' }}>Loading…</div>
 
