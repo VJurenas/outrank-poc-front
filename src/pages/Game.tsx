@@ -70,6 +70,12 @@ export default function Game() {
       .map(p => ({ label: p.intervalLabel, price: p.predictedPrice }))
   }, [id])
 
+  // Merge live zone into each prediction for zone-colored chart lines
+  const chartPredictions = useMemo(
+    () => myPredictions.map(p => ({ ...p, zone: myEntry?.zone })),
+    [myPredictions, myEntry?.zone]
+  )
+
   if (!game) return <div style={{ padding: 32, color: 'var(--muted)' }}>Loading…</div>
 
   return (
@@ -88,7 +94,7 @@ export default function Game() {
         <PriceChart
           asset={game.asset}
           latestPrice={latestPrice}
-          predictions={myPredictions}
+          predictions={chartPredictions}
           height={360}
         />
 
