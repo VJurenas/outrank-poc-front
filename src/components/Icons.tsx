@@ -143,3 +143,32 @@ export function AssetIcon({ asset, size = 20 }: { asset: string; size?: number }
   if (asset === 'HYPE') return <HypeIcon size={size} />
   return null
 }
+
+export function UsersIcon({ size = 18, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="7" r="3" />
+      <path d="M2 20c0-3.3 3.1-6 7-6s7 2.7 7 6" />
+      <circle cx="17" cy="7" r="3" />
+      <path d="M22 20c0-3.3-2.1-5.5-5-6" />
+    </svg>
+  )
+}
+
+export function SendIcon({ size = 16, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <line x1="22" y1="2" x2="11" y2="13" />
+      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+    </svg>
+  )
+}
+
+export function XIcon({ size = 16, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  )
+}

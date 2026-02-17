@@ -1,6 +1,33 @@
 import { useState } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { HomeIcon, TrophyIcon, MedalIcon, BubbleIcon, QuestionIcon, MenuIcon, ChevronIcon } from './Icons.tsx'
+import { useCommunity } from '../contexts/CommunityContext.tsx'
+
+function CommunityNavBtn({ collapsed }: { collapsed: boolean }) {
+  const { openTo, open, tab } = useCommunity()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const isActive = (open && tab === 'global') || location.pathname === '/community'
+  return (
+    <button
+      onClick={() => { openTo('global'); navigate('/community') }}
+      title={collapsed ? 'Community' : undefined}
+      style={{
+        display: 'flex', alignItems: 'center',
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        gap: 12, padding: collapsed ? '10px 0' : '10px 16px',
+        width: '100%', background: isActive ? 'var(--nav-active-bg)' : 'transparent',
+        border: 'none', cursor: 'pointer',
+        color: isActive ? 'var(--text)' : 'var(--muted)',
+        borderLeft: isActive ? '3px solid var(--gold)' : '3px solid transparent',
+        fontSize: 14,
+      }}
+    >
+      <BubbleIcon size={18} />
+      {!collapsed && 'Community'}
+    </button>
+  )
+}
 
 const COLLAPSED_KEY = 'sidebar_collapsed'
 
@@ -97,7 +124,7 @@ export default function Sidebar() {
         </div>
 
         <NavItem to="/leaderboard" icon={<MedalIcon />} label="Leaderboard" collapsed={collapsed} />
-        <NavItem to="/community" icon={<BubbleIcon />} label="Community" collapsed={collapsed} />
+        <CommunityNavBtn collapsed={collapsed} />
         <NavItem to="/help" icon={<QuestionIcon />} label="Help" collapsed={collapsed} />
       </nav>
     </aside>

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api, type GameInfo } from '../lib/api.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
+import { useCommunity } from '../contexts/CommunityContext.tsx'
 import PriceChart from '../components/PriceChart.tsx'
 
 type Session = { playerId: string; sessionToken: string; alias: string }
@@ -31,6 +32,12 @@ export default function Lobby() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user, openSignIn } = useAuth()
+  const { setGameSlug } = useCommunity()
+
+  useEffect(() => {
+    if (id) setGameSlug(id)
+    return () => setGameSlug(null)
+  }, [id, setGameSlug])
 
   const [game, setGame] = useState<GameInfo | null>(null)
   const [error, setError] = useState('')

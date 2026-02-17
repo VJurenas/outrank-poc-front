@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useLocation } from 'react-router-dom'
 import { api, type GameInfo, type LeaderboardEntry } from '../lib/api.ts'
 import { useGameWs } from '../hooks/useGameWs.ts'
+import { useCommunity } from '../contexts/CommunityContext.tsx'
 import PriceChart from '../components/PriceChart.tsx'
 import Leaderboard from '../components/Leaderboard.tsx'
 
@@ -10,6 +11,12 @@ type Session = { playerId: string; sessionToken: string; alias: string }
 export default function Game() {
   const { id } = useParams<{ id: string }>()
   const location = useLocation()
+  const { setGameSlug } = useCommunity()
+
+  useEffect(() => {
+    if (id) setGameSlug(id)
+    return () => setGameSlug(null)
+  }, [id, setGameSlug])
 
   const session: Session | null = (location.state as { session?: Session })?.session
     ?? JSON.parse(localStorage.getItem(`session-${id}`) ?? 'null')

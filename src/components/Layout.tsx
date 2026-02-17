@@ -2,6 +2,7 @@ import { useState, useEffect, type ReactNode } from 'react'
 import Sidebar from './Sidebar.tsx'
 import UserMenu from './UserMenu.tsx'
 import WalletSignIn from './WalletSignIn.tsx'
+import CommunityPanel from './CommunityPanel.tsx'
 import { SunIcon, MoonIcon } from './Icons.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useTheme } from '../contexts/ThemeContext.tsx'
@@ -80,6 +81,8 @@ export default function Layout({ children }: { children: ReactNode }) {
           {children}
         </main>
       </div>
+
+      <CommunityPanel />
 
       {signInOpen && <WalletSignIn />}
     </div>

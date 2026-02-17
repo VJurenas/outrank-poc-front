@@ -133,3 +133,73 @@ export const api = {
 
   getLeaderboard: (id: string) => json<LeaderboardEntry[]>(`/games/${id}/leaderboard`),
 }
+
+// ─── Community ────────────────────────────────────────────────────────────────
+
+export type ChatMessage = {
+  id: number
+  playerId: string
+  alias: string
+  content: string
+  createdAt: string
+}
+
+export type FriendEntry = { playerId: string; alias: string }
+export type InviteEntry = {
+  id: string
+  from?: FriendEntry
+  to?: FriendEntry
+}
+
+export function getChatMessages(channel: string, since?: number): Promise<{ messages: ChatMessage[] }> {
+  const qs = since ? `?since=${since}` : ''
+  return json(`/chat/${encodeURIComponent(channel)}${qs}`)
+}
+
+export function sendChatMessage(channel: string, content: string, token: string): Promise<{ message: ChatMessage }> {
+  return json(`/chat/${encodeURIComponent(channel)}`, {
+    method: 'POST',
+    headers: { 'x-user-token': token },
+    body: JSON.stringify({ content }),
+  })
+}
+
+export function getFriends(token: string): Promise<{ friends: FriendEntry[] }> {
+  return json('/friends', { headers: { 'x-user-token': token } })
+}
+
+export function getFriendInvites(token: string): Promise<{ incoming: InviteEntry[]; outgoing: InviteEntry[] }> {
+  return json('/friends/invites', { headers: { 'x-user-token': token } })
+}
+
+export function sendFriendInvite(toPlayerId: string, token: string): Promise<{ status: string }> {
+  return json('/friends/invite', {
+    method: 'POST',
+    headers: { 'x-user-token': token },
+    body: JSON.stringify({ toPlayerId }),
+  })
+}
+
+export function respondToInvite(inviteId: string, action: 'accept' | 'reject', token: string): Promise<{ ok: boolean }> {
+  return json(`/friends/invite/${inviteId}`, {
+    method: 'PATCH',
+    headers: { 'x-user-token': token },
+    body: JSON.stringify({ action }),
+  })
+}
+
+export function removeFriend(friendId: string, token: string): Promise<{ ok: boolean }> {
+  return json(`/friends/${friendId}`, { method: 'DELETE', headers: { 'x-user-token': token } })
+}
+
+export function searchPlayers(q: string): Promise<{ players: { playerId: string; alias: string; type: string }[] }> {
+  return json(`/players/search?q=${encodeURIComponent(q)}`)
+}
+
+export function sendTip(toPlayerId: string, amount: number, token: string): Promise<{ ok: boolean }> {
+  return json('/tips', {
+    method: 'POST',
+    headers: { 'x-user-token': token },
+    body: JSON.stringify({ toPlayerId, amount }),
+  })
+}
