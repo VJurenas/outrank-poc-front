@@ -82,10 +82,23 @@ export default function FriendsTab() {
     </button>
   )
 
-  if (!user) return <div style={{ padding: 16, fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>Sign in to view friends</div>
+  const header = (
+    <div style={{ padding: '7px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)', fontSize: 13, color: 'var(--text)', fontWeight: 700, letterSpacing: '0.08em' }}>
+      FRIEND LIST
+    </div>
+  )
+
+  if (!user) return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {header}
+      <div style={{ padding: 16, fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>Sign in to view friends</div>
+    </div>
+  )
 
   return (
-    <div style={{ overflowY: 'auto', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {header}
+    <div style={{ overflowY: 'auto', flex: 1 }}>
       {/* Search */}
       <div style={{ padding: '10px 10px 6px' }}>
         <input
@@ -172,6 +185,7 @@ export default function FriendsTab() {
           onClose={() => setCtx(null)}
         />
       )}
+    </div>
     </div>
   )
 }

@@ -4,11 +4,11 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import UserContextMenu from './UserContextMenu.tsx'
 import { SendIcon } from './Icons.tsx'
 
-type Props = { channel: string; label: string }
+type Props = { channel: string; title: string }
 
 type CtxMenu = { playerId: string; alias: string; x: number; y: number }
 
-export default function ChatTab({ channel, label }: Props) {
+export default function ChatTab({ channel, title }: Props) {
   const { user } = useAuth()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -80,9 +80,9 @@ export default function ChatTab({ channel, label }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Channel label */}
-      <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--border)', fontSize: 11, color: 'var(--muted)', fontWeight: 600, letterSpacing: '0.05em' }}>
-        # {label}
+      {/* Channel title */}
+      <div style={{ padding: '7px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)', fontSize: 13, color: 'var(--text)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+        {title}
       </div>
 
       {/* Messages */}
