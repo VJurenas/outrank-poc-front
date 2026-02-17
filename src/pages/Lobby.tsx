@@ -216,17 +216,9 @@ export default function Lobby() {
 
   return (
     <div style={{ maxWidth: 480, margin: '0 auto' }}>
-      <h1 style={{ fontSize: 22, marginBottom: 4 }}>
-        {game.asset} / USD — {game.mode === '15min' ? '15-Minute Market' : '60-Minute Market'}
+      <h1 style={{ fontSize: 22, marginBottom: 24 }}>
+        {game.asset} / USD — {game.mode === '15min' ? '15Min League' : '1H League'} - {game.kickoff_at.slice(11,16)}
       </h1>
-      <div style={{ color: 'var(--muted)', marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <span>Lobby</span>
-        {livePrice !== null && (
-          <span style={{ color: 'var(--text)', fontSize: 20, fontWeight: 700 }}>
-            ${livePrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-          </span>
-        )}
-      </div>
 
       {/* Price chart */}
       <div style={{ marginBottom: 20 }}>
@@ -236,6 +228,7 @@ export default function Lobby() {
           predictions={chartPredictions}
           height={240}
           onPriceClick={session && !submitted ? handleChartPriceClick : undefined}
+          enableYZoom={!!session && !submitted}
         />
       </div>
 
@@ -279,7 +272,7 @@ export default function Lobby() {
             {livePrice !== null && <span style={{ color: 'var(--accent-2)' }}> · now ${livePrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>}
           </div>
           <div style={{ color: 'var(--muted)', fontSize: 11, marginBottom: 6, opacity: 0.7 }}>
-            Click the chart above to set a price, or type below
+            Tip: click the chart above to set a price, scroll to change the zoom on price axis.
           </div>
           {intervals.map(label => {
             const isActive = label === activeLabel
@@ -334,6 +327,21 @@ export default function Lobby() {
               borderRadius: 8, padding: 16, marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ color: 'var(--success-text)' }}>Predictions locked in!</span>
+
+
+          {intervals.map(label => {
+            const stored = (JSON.parse(localStorage.getItem(`predictions-${id}`) ?? '[]') as Prediction[])
+              .find(p => p.intervalLabel === label)
+            return stored ? (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', fontSize: 13, marginBottom: 4 }}>
+                <span style={{ marginRight: 10 }}>{label}</span>
+                <span style={{ color: 'var(--text)' }}>${stored.predictedPrice.toLocaleString()}</span>
+              </div>
+            ) : null
+          })}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text)', fontSize: 12, marginTop: 8 }}>
+            <span>Staked <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{intervals.length * STAKE_PER_PREDICTION} RANK</span> · Waiting for kickoff…</span>
             <button
               onClick={handleEditPredictions}
               style={{
@@ -344,19 +352,6 @@ export default function Lobby() {
             >
               Edit
             </button>
-          </div>
-          {intervals.map(label => {
-            const stored = (JSON.parse(localStorage.getItem(`predictions-${id}`) ?? '[]') as Prediction[])
-              .find(p => p.intervalLabel === label)
-            return stored ? (
-              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', fontSize: 13, marginBottom: 4 }}>
-                <span>{label}</span>
-                <span style={{ color: 'var(--text)' }}>${stored.predictedPrice.toLocaleString()}</span>
-              </div>
-            ) : null
-          })}
-          <div style={{ color: 'var(--text)', fontSize: 12, marginTop: 8 }}>
-            Staked <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{intervals.length * STAKE_PER_PREDICTION} RANK</span> · Waiting for kickoff…
           </div>
         </div>
       )}

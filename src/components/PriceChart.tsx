@@ -22,6 +22,8 @@ type Props = {
   predictions?: ChartPrediction[]
   height?: number
   onPriceClick?: (price: number) => void
+  /** When true, mouse-wheel / touchpad scroll zooms the y-axis only. */
+  enableYZoom?: boolean
 }
 
 const WINDOW_SECONDS = 5 * 60   // 5-minute sliding window
@@ -50,22 +52,26 @@ type PredLine = {
   isClamped: boolean   // tracks current state so we only call applyOptions on transitions
 }
 
-export default function PriceChart({ asset, latestPrice, predictions = [], height = 320, onPriceClick }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const chartRef     = useRef<IChartApi | null>(null)
-  const seriesRef    = useRef<ISeriesApi<'Line'> | null>(null)
-  const predLinesRef = useRef<PredLine[]>([])
+export default function PriceChart({ asset, latestPrice, predictions = [], height = 320, onPriceClick, enableYZoom }: Props) {
+  const containerRef  = useRef<HTMLDivElement>(null)
+  const chartRef      = useRef<IChartApi | null>(null)
+  const seriesRef     = useRef<ISeriesApi<'Line'> | null>(null)
+  const predLinesRef  = useRef<PredLine[]>([])
+  const yZoomRef      = useRef(0)      // accumulated scroll steps; 0 = default margins
+  const zoomLabelRef  = useRef<HTMLDivElement>(null)
 
   // Refs used inside the animation loop to avoid stale closures
   const latestPriceRef  = useRef<number | undefined>(latestPrice)
   const predictionsRef  = useRef<ChartPrediction[]>(predictions)
   const heightRef       = useRef(height)
   const onPriceClickRef = useRef(onPriceClick)
+  const enableYZoomRef  = useRef(enableYZoom)
 
   useEffect(() => { latestPriceRef.current  = latestPrice },  [latestPrice])
   useEffect(() => { predictionsRef.current  = predictions },  [predictions])
   useEffect(() => { heightRef.current       = height },       [height])
   useEffect(() => { onPriceClickRef.current = onPriceClick }, [onPriceClick])
+  useEffect(() => { enableYZoomRef.current  = enableYZoom },  [enableYZoom])
 
   const { theme } = useTheme()
 
@@ -198,6 +204,33 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
       if (price !== null) onPriceClickRef.current?.(price)
     })
 
+    // Y-axis zoom via mouse wheel / touchpad scroll.
+    // Wider scaleMargins → chart data occupies less vertical space → visible price
+    // range expands, letting the user click prices far from the current level.
+    // X-axis is untouched; the existing setVisibleRange() in the loop controls it.
+    function applyYZoom() {
+      const zoom   = yZoomRef.current
+      // Each step adds 4% margin on each side. Base = 10%, max = 45%.
+      const margin = Math.min(0.45, 0.10 + zoom * 0.04)
+      chart.priceScale('right').applyOptions({ scaleMargins: { top: margin, bottom: margin } })
+      if (zoomLabelRef.current) {
+        zoomLabelRef.current.textContent = zoom > 0 ? `${(1 + zoom * 0.4).toFixed(1)}× zoom` : ''
+      }
+    }
+
+    // Always register the wheel listener so it works even if enableYZoom becomes
+    // true after the initial render (e.g. after the user joins the game in Lobby).
+    // The ref is checked at call time so no stale-closure issue arises.
+    const onWheel = (e: WheelEvent) => {
+      if (!enableYZoomRef.current) return
+      e.preventDefault()
+      // deltaY / 80 gives ~1 step per mouse-wheel click and smooth touchpad ramp.
+      yZoomRef.current = Math.max(0, Math.min(15, yZoomRef.current + e.deltaY / 80))
+      applyYZoom()
+    }
+    container.addEventListener('wheel', onWheel, { passive: false })
+    ;(container as HTMLElement & { _onWheel?: (e: WheelEvent) => void })._onWheel = onWheel
+
     // Load 5 min of history then set initial visible range
     fetch(`/api/prices/history/${asset}`)
       .then(r => r.json())
@@ -241,6 +274,8 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
     return () => {
       clearInterval(loopId)
       ro.disconnect()
+      const storedWheel = (container as HTMLElement & { _onWheel?: (e: WheelEvent) => void })._onWheel
+      if (storedWheel) container.removeEventListener('wheel', storedWheel)
       chart.remove()
       chartRef.current  = null
       seriesRef.current = null
@@ -288,7 +323,19 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
           </span>
         )}
       </div>
-      <div ref={containerRef} style={{ width: '100%', height, cursor: onPriceClick ? 'crosshair' : undefined }} />
+      <div style={{ position: 'relative' }}>
+        <div ref={containerRef} style={{ width: '100%', height, cursor: onPriceClick ? 'crosshair' : undefined }} />
+        {enableYZoom && (
+          <div
+            ref={zoomLabelRef}
+            style={{
+              position: 'absolute', bottom: 32, left: 6,
+              fontSize: 10, color: 'var(--muted)', opacity: 0.75,
+              pointerEvents: 'none', userSelect: 'none',
+            }}
+          />
+        )}
+      </div>
     </div>
   )
 }
