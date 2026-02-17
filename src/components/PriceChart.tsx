@@ -26,6 +26,8 @@ type Props = {
 const WINDOW_SECONDS = 5 * 60   // 5-minute sliding window
 const LOOKAHEAD = 60             // right-side padding — one empty minute on the right
 const TICK_MS = 40               // 25 fps (redraws current 1-second bar smoothly)
+const TOP_EDGE_PX    = 3    // inset from top when clamping (no time-scale margin up here)
+const BOTTOM_EDGE_PX = 30   // inset from bottom — must clear the ~26px time-scale area
 
 function readVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -38,13 +40,20 @@ function zoneColor(zone?: 'gold' | 'silver' | 'dead'): string {
   return readVar('--chart-pred')
 }
 
+// Stores the live price line handle plus the original (unclamped) prediction data.
+type PredLine = {
+  line: ReturnType<ISeriesApi<'Line'>['createPriceLine']>
+  originalPrice: number
+  label: string
+  zone?: ChartPrediction['zone']
+  isClamped: boolean   // tracks current state so we only call applyOptions on transitions
+}
+
 export default function PriceChart({ asset, latestPrice, predictions = [], height = 320 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const overlayRef   = useRef<HTMLDivElement>(null)
-  const chartRef  = useRef<IChartApi | null>(null)
-  const seriesRef = useRef<ISeriesApi<'Line'> | null>(null)
-  const predLinesRef    = useRef<ReturnType<ISeriesApi<'Line'>['createPriceLine']>[]>([])
-  const overlayDivsRef  = useRef<Map<string, HTMLDivElement>>(new Map())
+  const chartRef     = useRef<IChartApi | null>(null)
+  const seriesRef    = useRef<ISeriesApi<'Line'> | null>(null)
+  const predLinesRef = useRef<PredLine[]>([])
 
   // Refs used inside the animation loop to avoid stale closures
   const latestPriceRef  = useRef<number | undefined>(latestPrice)
@@ -57,68 +66,15 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
 
   const { theme } = useTheme()
 
-  // ─── Out-of-bounds overlay helpers ─────────────────────────────────────────
-
-  function updateOutOfBoundsOverlays() {
-    if (!seriesRef.current || !overlayRef.current) return
-    const preds = predictionsRef.current
-    const h     = heightRef.current
-    const EDGE  = 24   // px from the edge where the indicator sits
-
-    for (const pred of preds) {
-      if (!pred.price || pred.price <= 0) continue
-      const coord = seriesRef.current.priceToCoordinate(pred.price)
-      const isAbove = coord !== null && coord < 0
-      const isBelow = coord !== null && coord > h
-
-      let el = overlayDivsRef.current.get(pred.label)
-
-      if (!isAbove && !isBelow) {
-        if (el) el.style.display = 'none'
-        continue
-      }
-
-      if (!el) {
-        el = document.createElement('div')
-        el.style.cssText = [
-          'position:absolute', 'left:6px',
-          'padding:2px 7px', 'border-radius:3px',
-          'font-size:10px', 'font-weight:700',
-          'pointer-events:none', 'white-space:nowrap',
-          'opacity:0.65',
-        ].join(';')
-        overlayRef.current.appendChild(el)
-        overlayDivsRef.current.set(pred.label, el)
-      }
-
-      const color = zoneColor(pred.zone)
-      el.style.display     = 'block'
-      el.style.color       = color
-      el.style.background  = `${color}20`
-      el.style.border      = `1px solid ${color}55`
-      el.style.top         = isAbove ? `${EDGE}px` : 'auto'
-      el.style.bottom      = isBelow ? `${EDGE}px` : 'auto'
-      el.textContent       = isAbove ? `↑ ${pred.label}` : `↓ ${pred.label}`
-    }
-
-    // Remove divs whose prediction is gone
-    for (const [label, el] of overlayDivsRef.current) {
-      if (!preds.find(p => p.label === label)) {
-        el.remove()
-        overlayDivsRef.current.delete(label)
-      }
-    }
-  }
-
   // ─── Prediction price lines ─────────────────────────────────────────────────
 
   function applyPredictionLines(preds: ChartPrediction[]) {
     if (!seriesRef.current) return
-    for (const line of predLinesRef.current) seriesRef.current.removePriceLine(line)
+    for (const { line } of predLinesRef.current) seriesRef.current.removePriceLine(line)
     predLinesRef.current = preds
       .filter(p => p.price > 0)
-      .map(p =>
-        seriesRef.current!.createPriceLine({
+      .map(p => {
+        const line = seriesRef.current!.createPriceLine({
           price:            p.price,
           color:            zoneColor(p.zone),
           lineWidth:        1,
@@ -126,7 +82,61 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
           axisLabelVisible: true,
           title:            p.label,
         })
-      )
+        return { line, originalPrice: p.price, label: p.label, zone: p.zone, isClamped: false }
+      })
+  }
+
+  // Called every animation frame. Clamps each prediction line to the currently
+  // visible price range so it is always visible on screen.
+  //
+  // Range detection uses priceToCoordinate (price → pixel), which reliably returns
+  // values outside [0, h] for out-of-range prices. coordinateToPrice is only used
+  // to find the edge price when we need to reposition the line.
+  //
+  // A `isClamped` flag on each PredLine means we only call applyOptions when the
+  // visibility state *changes*, which avoids floating-point false positives that
+  // would otherwise hide the axis label on within-range lines.
+  //
+  // When within range:   line sits at originalPrice, title = label, axisLabel visible.
+  // When out of range:   line sits at edge price,    title = "label  price", axisLabel hidden.
+  function updatePredictionLinePrices() {
+    if (!seriesRef.current || predLinesRef.current.length === 0) return
+    const series = seriesRef.current
+    const h = heightRef.current
+
+    for (const pred of predLinesRef.current) {
+      const coord = series.priceToCoordinate(pred.originalPrice)
+      if (coord === null) continue  // series not ready yet
+
+      const isAbove = coord < 0
+      const isBelow = coord > h
+
+      if (!isAbove && !isBelow) {
+        // Within the visible range. Only update if transitioning back from a clamped state.
+        if (pred.isClamped) {
+          pred.isClamped = false
+          pred.line.applyOptions({
+            price:            pred.originalPrice,
+            title:            pred.label,
+            axisLabelVisible: true,
+          })
+        }
+        continue
+      }
+
+      // Out of visible range — snap to top or bottom edge.
+      // TOP_EDGE_PX is safe (no margin at top).
+      // BOTTOM_EDGE_PX is generous enough to clear the ~26px time-scale area.
+      const edgePrice = series.coordinateToPrice(isAbove ? TOP_EDGE_PX : h - BOTTOM_EDGE_PX)
+      if (edgePrice === null) continue
+
+      pred.isClamped = true
+      pred.line.applyOptions({
+        price:            edgePrice,
+        title:            `${pred.label}   ${pred.originalPrice.toLocaleString()}`,
+        axisLabelVisible: true,
+      })
+    }
   }
 
   // ─── Chart creation, history load, animation loop ──────────────────────────
@@ -172,11 +182,6 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
     const series = chart.addLineSeries({
       color:                  readVar('--chart-line'),
       lineWidth:              2,
-      // LineType.Curved uses Catmull-Rom splines. lightweight-charts v4 does not
-      // expose a tension parameter — the curvature is fixed. Using fractional-
-      // second timestamps (Date.now()/1000) gives 25 genuine control points per
-      // second so the curve naturally follows the x-axis rather than making
-      // large vertical S-curves between 1-second buckets.
       lineType:               LineType.Curved,
       priceFormat:            { type: 'price', precision: 2, minMove: 0.01 },
       crosshairMarkerVisible: false,
@@ -215,7 +220,7 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
         from: (t - WINDOW_SECONDS) as UTCTimestamp,
         to:   (t + LOOKAHEAD)      as UTCTimestamp,
       })
-      updateOutOfBoundsOverlays()
+      updatePredictionLinePrices()
     }, TICK_MS)
 
     const ro = new ResizeObserver(() => {
@@ -226,9 +231,6 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
     return () => {
       clearInterval(loopId)
       ro.disconnect()
-      // Clear overlay DOM elements
-      for (const el of overlayDivsRef.current.values()) el.remove()
-      overlayDivsRef.current.clear()
       chart.remove()
       chartRef.current  = null
       seriesRef.current = null
@@ -276,14 +278,7 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
           </span>
         )}
       </div>
-      <div style={{ position: 'relative' }}>
-        <div ref={containerRef} style={{ width: '100%', height }} />
-        {/* Overlay for out-of-bounds prediction indicators */}
-        <div
-          ref={overlayRef}
-          style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
-        />
-      </div>
+      <div ref={containerRef} style={{ width: '100%', height }} />
     </div>
   )
 }
