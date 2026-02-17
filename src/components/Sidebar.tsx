@@ -7,7 +7,7 @@ function CommunityNavBtn({ collapsed }: { collapsed: boolean }) {
   const { openTo, open, tab } = useCommunity()
   const navigate = useNavigate()
   const location = useLocation()
-  const isActive = (open && tab === 'global') || location.pathname === '/community'
+  const isActive = location.pathname === '/community'
   return (
     <button
       onClick={() => { openTo('global'); navigate('/community') }}

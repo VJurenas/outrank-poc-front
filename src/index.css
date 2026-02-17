@@ -2,6 +2,9 @@
 
 /* ─── Dark theme (default) ───────────────────────────────────────── */
 :root, [data-theme="dark"] {
+  --scrollbar-thumb: #2a3a4a;
+  --scrollbar-track: #0d1520;
+
   /* Raw palette — change these 4 to retheme dark mode */
   --palette-accent:   #FF6500;
   --palette-surface:  #121212;
@@ -62,6 +65,9 @@
 
 /* ─── Light theme ─────────────────────────────────────────────────────────── */
 [data-theme="light"] {
+  --scrollbar-thumb: #c4bebe;
+  --scrollbar-track: #f0ecec;
+
   /* Raw palette — change these 4 to retheme light mode */
   --palette-accent:   #FEB05D;
   --palette-surface:  #FDFAF6;
@@ -119,6 +125,15 @@
   --chart-line:   #5A7ACD;
   --chart-pred:   #c4830a;
 }
+
+/* ─── Themed scrollbars ───────────────────────────────────────────────────── */
+/* Firefox */
+* { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); }
+/* WebKit / Blink */
+::-webkit-scrollbar              { width: 6px; height: 6px; }
+::-webkit-scrollbar-track        { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb        { background: var(--scrollbar-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover  { background: var(--muted); }
 
 /* ─── Base styles ─────────────────────────────────────────────────────────── */
 body {
