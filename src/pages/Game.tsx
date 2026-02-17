@@ -86,7 +86,7 @@ export default function Game() {
   if (!game) return <div style={{ padding: 32, color: 'var(--muted)' }}>Loading…</div>
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16, height: '100vh', padding: 16 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16, height: '100%', padding: 16 }}>
       {/* Left: chart + status */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -137,8 +137,8 @@ export default function Game() {
 
       {/* Right: leaderboard */}
       <div style={{ overflow: 'auto' }}>
-        <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 8 }}>
-          Leaderboard · {leaderboard.length} players
+        <div style={{ color: 'var(--muted)', fontSize: 13, padding: '6px 0 16px' }}>
+          LEADERBOARD · {leaderboard.length} players
           {tracked.size > 0 && <span style={{ color: 'var(--accent-2)' }}> · tracking {tracked.size}</span>}
         </div>
         <Leaderboard
