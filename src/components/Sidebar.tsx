@@ -4,7 +4,7 @@ import { HomeIcon, TrophyIcon, MedalIcon, BubbleIcon, QuestionIcon, MenuIcon, Ch
 import { useCommunity } from '../contexts/CommunityContext.tsx'
 
 function CommunityNavBtn({ collapsed }: { collapsed: boolean }) {
-  const { openTo, open, tab } = useCommunity()
+  const { openTo } = useCommunity()
   const navigate = useNavigate()
   const location = useLocation()
   const isActive = location.pathname === '/community'
@@ -66,15 +66,14 @@ export default function Sidebar() {
         title={collapsed ? 'Expand menu' : 'Collapse menu'}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start',
-          gap: 12, padding: collapsed ? '14px 0' : '14px 16px',
+          gap: 12, padding: collapsed ? '0' : '0 16px',
           background: 'transparent', border: 'none',
-          borderBottom: '1px solid var(--border)',
           cursor: 'pointer', color: 'var(--muted)',
-          minHeight: 48, width: '100%',
+          height: 64, minHeight: 64, width: '100%',
         }}
       >
-        <MenuIcon size={18} />
-        {!collapsed && <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', letterSpacing: '0.05em' }}>OUTRANK</span>}
+        <MenuIcon size={21} />
+        {!collapsed && <span style={{ fontSize: 21, fontWeight: 700, color: 'var(--text)', letterSpacing: '0.05em' }}>OUTRANK</span>}
       </button>
 
       {/* Nav items */}
