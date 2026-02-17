@@ -55,7 +55,7 @@ export default function Home() {
       {loading && <p style={{ color: 'var(--muted)' }}>Loading…</p>}
 
       {/* Live Leagues */}
-      <h1 style={{ margin: '0 0 16px', fontSize: 22 }}>Live Leagues</h1>
+      <h1 style={{ margin: '0 0 16px', fontSize: 21 }}>Live Leagues</h1>
 
       {!loading && live.length === 0 && (
         <div style={{
@@ -80,7 +80,7 @@ export default function Home() {
       {/* Upcoming Leagues */}
       {upcoming.length > 0 && (
         <>
-          <h2 style={{ margin: '0 0 16px', fontSize: 18 }}>Upcoming Leagues</h2>
+          <h2 style={{ margin: '0 0 16px', fontSize: 21 }}>Upcoming Leagues</h2>
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
