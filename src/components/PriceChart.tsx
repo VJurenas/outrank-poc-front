@@ -243,21 +243,27 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
   }, [predictions]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!chartRef.current || !seriesRef.current) return
-    chartRef.current.applyOptions({
-      layout: {
-        background: { color: readVar('--chart-bg') },
-        textColor:  readVar('--chart-text'),
-      },
-      grid: {
-        vertLines: { color: readVar('--chart-grid') },
-        horzLines: { color: readVar('--chart-grid') },
-      },
-      rightPriceScale: { borderColor: readVar('--chart-border') },
-      timeScale:       { borderColor: readVar('--chart-border') },
+    // Use rAF so readVar() fires after the browser has committed the new
+    // data-theme attribute and recomputed CSS custom property values.
+    // Without this, the first theme switch reads stale variable values and
+    // subsequent switches appear inverted.
+    requestAnimationFrame(() => {
+      if (!chartRef.current || !seriesRef.current) return
+      chartRef.current.applyOptions({
+        layout: {
+          background: { color: readVar('--chart-bg') },
+          textColor:  readVar('--chart-text'),
+        },
+        grid: {
+          vertLines: { color: readVar('--chart-grid') },
+          horzLines: { color: readVar('--chart-grid') },
+        },
+        rightPriceScale: { borderColor: readVar('--chart-border') },
+        timeScale:       { borderColor: readVar('--chart-border') },
+      })
+      seriesRef.current.applyOptions({ color: readVar('--chart-line') })
+      applyPredictionLines(predictions)
     })
-    seriesRef.current.applyOptions({ color: readVar('--chart-line') })
-    applyPredictionLines(predictions)
   }, [theme]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
