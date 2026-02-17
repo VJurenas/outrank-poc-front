@@ -52,6 +52,8 @@ export default function Lobby() {
   const [allPredictions, setAllPredictions] = useState<{ alias: string; interval_label: string; predicted_price: number }[]>([])
   const [joining, setJoining] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [pendingConfirm, setPendingConfirm] = useState(false)
+  const [activeLabel, setActiveLabel] = useState<string | null>(null)
 
   const kickoffDate = useMemo(
     () => game ? new Date(game.kickoff_at) : undefined,
@@ -112,6 +114,15 @@ export default function Lobby() {
 
   const intervals = game?.mode === '15min' ? ['T+15'] : ['T+15', 'T+30', 'T+45', 'T+60']
 
+  const closeDate = useMemo(() => {
+    if (!kickoffDate || !game) return undefined
+    const ms = game.mode === '15min' ? 15 * 60_000 : 60 * 60_000
+    return new Date(kickoffDate.getTime() + ms)
+  }, [kickoffDate, game?.mode]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Default active label to first interval once we know the game mode
+  if (activeLabel === null && intervals.length > 0) setActiveLabel(intervals[0])
+
   // Stable reference: only recompute when the stored prediction values change
   const chartPredictions = useMemo(() => {
     if (!submitted || !id) return []
@@ -136,6 +147,37 @@ export default function Lobby() {
 
   const STAKE_PER_PREDICTION = 100
   const isResubmit = submitted  // true when editing a previously submitted set
+
+  // When user clicks the price chart: fill the activeLabel input, then advance
+  // to the next empty interval so successive clicks fill them in order.
+  function handleChartPriceClick(price: number) {
+    if (submitted || !activeLabel) return
+    const rounded = Math.round(price * 100) / 100
+    setPredictions(prev => {
+      const next = { ...prev, [activeLabel]: String(rounded) }
+      // Advance activeLabel to the first interval that is still empty after this fill
+      const idx = intervals.indexOf(activeLabel)
+      for (let i = 1; i <= intervals.length; i++) {
+        const candidate = intervals[(idx + i) % intervals.length]
+        if (!next[candidate]) { setActiveLabel(candidate); break }
+      }
+      return next
+    })
+  }
+
+  // Validate inputs and show the confirm modal instead of submitting directly
+  function handleLockInClick() {
+    const preds: Prediction[] = intervals.map(label => ({
+      intervalLabel: label,
+      predictedPrice: parseFloat(predictions[label] ?? '0'),
+    }))
+    if (preds.some(p => isNaN(p.predictedPrice) || p.predictedPrice <= 0)) {
+      setError('All predictions must be valid positive prices')
+      return
+    }
+    setError('')
+    setPendingConfirm(true)
+  }
 
   function handleEditPredictions() {
     const stored = JSON.parse(localStorage.getItem(`predictions-${id}`) ?? '[]') as Prediction[]
@@ -193,13 +235,14 @@ export default function Lobby() {
           latestPrice={livePrice ?? undefined}
           predictions={chartPredictions}
           height={240}
+          onPriceClick={session && !submitted ? handleChartPriceClick : undefined}
         />
       </div>
 
       {/* Countdown */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 20, marginBottom: 24 }}>
-        <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 4 }}>Kickoff in</div>
-        <div style={{ fontSize: 40, fontWeight: 700, letterSpacing: 2, color: remaining < 30000 ? 'var(--error)' : 'var(--text)' }}>
+        <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 4, textAlign: 'center' }}>Kickoff in</div>
+        <div style={{ fontSize: 40, fontWeight: 700, letterSpacing: 2, color: remaining < 30000 ? 'var(--error)' : 'var(--text)', textAlign: 'center' }}>
           {formatMs(remaining)}
         </div>
       </div>
@@ -235,18 +278,35 @@ export default function Lobby() {
             Enter your price prediction(s) for {game.asset}
             {livePrice !== null && <span style={{ color: 'var(--accent-2)' }}> · now ${livePrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>}
           </div>
-          {intervals.map(label => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span style={{ width: 48, color: 'var(--muted)', fontSize: 12 }}>{label}</span>
-              <input
-                type="number"
-                placeholder="Price (USD)"
-                value={predictions[label] ?? ''}
-                onChange={e => setPredictions(prev => ({ ...prev, [label]: e.target.value }))}
-                style={{ flex: 1 }}
-              />
-            </div>
-          ))}
+          <div style={{ color: 'var(--muted)', fontSize: 11, marginBottom: 6, opacity: 0.7 }}>
+            Click the chart above to set a price, or type below
+          </div>
+          {intervals.map(label => {
+            const isActive = label === activeLabel
+            return (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span
+                  onClick={() => setActiveLabel(label)}
+                  style={{
+                    width: 48, fontSize: 12, cursor: 'pointer',
+                    color: isActive ? 'var(--gold)' : 'var(--muted)',
+                    fontWeight: isActive ? 700 : 400,
+                  }}
+                  title="Click to target this interval with chart clicks"
+                >
+                  {label}
+                </span>
+                <input
+                  type="number"
+                  placeholder="Price (USD)"
+                  value={predictions[label] ?? ''}
+                  onFocus={() => setActiveLabel(label)}
+                  onChange={e => setPredictions(prev => ({ ...prev, [label]: e.target.value }))}
+                  style={{ flex: 1, borderColor: isActive ? 'var(--gold)' : undefined }}
+                />
+              </div>
+            )
+          })}
           {/* Stake summary */}
           <div style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -262,22 +322,24 @@ export default function Lobby() {
           </div>
 
           {error && <div style={{ color: 'var(--error)', fontSize: 12, marginTop: 8 }}>{error}</div>}
-          <button onClick={submitPredictions} disabled={submitting} style={{ width: '100%', fontWeight: 700, fontSize: 15, color: 'var(--gold)', marginTop: 10, backgroundColor: 'var(--zone-gold-bg)', padding: '12px 0', border: '2px solid var(--zone-gold-border)', borderRadius: 6, cursor: 'pointer' }}>
+          <button onClick={handleLockInClick} disabled={submitting} style={{ width: '100%', fontWeight: 700, fontSize: 15, color: 'var(--gold)', marginTop: 10, backgroundColor: 'var(--zone-gold-bg)', padding: '12px 0', border: '2px solid var(--zone-gold-border)', borderRadius: 6, cursor: 'pointer' }}>
             {submitting ? 'Submitting…' : isResubmit ? 'Update Predictions' : 'LOCK IN PREDICTIONS'}
           </button>
         </div>
       )}
 
       {session && submitted && (
-        <div style={{ background: 'var(--success-bg)', border: '1px solid var(--success-border)', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+        <div style={{
+              background: 'var(--success-bg)', border: '1px solid var(--success-border)', 
+              borderRadius: 8, padding: 16, marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ color: 'var(--success-text)' }}>Predictions locked in!</span>
             <button
               onClick={handleEditPredictions}
               style={{
-                fontSize: 12, padding: '3px 10px',
-                background: 'transparent', border: '1px solid var(--border)',
-                color: 'var(--muted)', cursor: 'pointer', borderRadius: 4,
+                fontSize: 15, padding: '3px 10px',
+                background: 'var(--zone-gold-bg)', border: '1px solid var(--zone-gold-border)',
+                color: 'var(--gold)', cursor: 'pointer', borderRadius: 4,
               }}
             >
               Edit
@@ -293,8 +355,77 @@ export default function Lobby() {
               </div>
             ) : null
           })}
-          <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 8 }}>
-            Staked {intervals.length * STAKE_PER_PREDICTION} RANK · Waiting for kickoff…
+          <div style={{ color: 'var(--text)', fontSize: 12, marginTop: 8 }}>
+            Staked <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{intervals.length * STAKE_PER_PREDICTION} RANK</span> · Waiting for kickoff…
+          </div>
+        </div>
+      )}
+
+      {/* ── Confirm modal ── */}
+      {pendingConfirm && game && (
+        <div
+          onClick={() => setPendingConfirm(false)}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.55)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 10, padding: 28, maxWidth: 380, width: '90%',
+            }}
+          >
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Confirm your prediction</div>
+
+            {intervals.length === 1 ? (
+              <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6, marginBottom: 16 }}>
+                I predict that <strong>{game.asset}</strong> will close near{' '}
+                <strong style={{ color: 'var(--gold)' }}>
+                  ${parseFloat(predictions[intervals[0]] ?? '0').toLocaleString()}
+                </strong>{' '}
+                at{' '}
+                <strong>
+                  {closeDate?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) ?? '—'}
+                </strong>
+              </p>
+            ) : (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>
+                  My predictions for <strong style={{ color: 'var(--text)' }}>{game.asset}</strong>
+                  {' '}closing at{' '}
+                  <strong style={{ color: 'var(--text)' }}>
+                    {closeDate?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) ?? '—'}
+                  </strong>:
+                </div>
+                {intervals.map(label => (
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                    <span style={{ color: 'var(--muted)' }}>{label}</span>
+                    <strong style={{ color: 'var(--gold)' }}>
+                      ${parseFloat(predictions[label] ?? '0').toLocaleString()}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <button
+                onClick={() => setPendingConfirm(false)}
+                style={{ flex: 1, background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { setPendingConfirm(false); submitPredictions() }}
+                style={{ flex: 2, fontWeight: 700, color: 'var(--gold)', backgroundColor: 'var(--zone-gold-bg)', border: '2px solid var(--zone-gold-border)', borderRadius: 6 }}
+              >
+                CONFIRM
+              </button>
+            </div>
           </div>
         </div>
       )}

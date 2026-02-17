@@ -21,6 +21,7 @@ type Props = {
   latestPrice?: number
   predictions?: ChartPrediction[]
   height?: number
+  onPriceClick?: (price: number) => void
 }
 
 const WINDOW_SECONDS = 5 * 60   // 5-minute sliding window
@@ -49,7 +50,7 @@ type PredLine = {
   isClamped: boolean   // tracks current state so we only call applyOptions on transitions
 }
 
-export default function PriceChart({ asset, latestPrice, predictions = [], height = 320 }: Props) {
+export default function PriceChart({ asset, latestPrice, predictions = [], height = 320, onPriceClick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef     = useRef<IChartApi | null>(null)
   const seriesRef    = useRef<ISeriesApi<'Line'> | null>(null)
@@ -59,10 +60,12 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
   const latestPriceRef  = useRef<number | undefined>(latestPrice)
   const predictionsRef  = useRef<ChartPrediction[]>(predictions)
   const heightRef       = useRef(height)
+  const onPriceClickRef = useRef(onPriceClick)
 
-  useEffect(() => { latestPriceRef.current  = latestPrice }, [latestPrice])
-  useEffect(() => { predictionsRef.current  = predictions }, [predictions])
-  useEffect(() => { heightRef.current       = height },      [height])
+  useEffect(() => { latestPriceRef.current  = latestPrice },  [latestPrice])
+  useEffect(() => { predictionsRef.current  = predictions },  [predictions])
+  useEffect(() => { heightRef.current       = height },       [height])
+  useEffect(() => { onPriceClickRef.current = onPriceClick }, [onPriceClick])
 
   const { theme } = useTheme()
 
@@ -188,6 +191,13 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
     })
     seriesRef.current = series
 
+    // Convert click y-coordinate to price and forward to parent
+    chart.subscribeClick((param) => {
+      if (!param.point || !seriesRef.current) return
+      const price = seriesRef.current.coordinateToPrice(param.point.y)
+      if (price !== null) onPriceClickRef.current?.(price)
+    })
+
     // Load 5 min of history then set initial visible range
     fetch(`/api/prices/history/${asset}`)
       .then(r => r.json())
@@ -278,7 +288,7 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
           </span>
         )}
       </div>
-      <div ref={containerRef} style={{ width: '100%', height }} />
+      <div ref={containerRef} style={{ width: '100%', height, cursor: onPriceClick ? 'crosshair' : undefined }} />
     </div>
   )
 }
