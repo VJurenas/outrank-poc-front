@@ -262,8 +262,8 @@ export default function Lobby() {
           </div>
 
           {error && <div style={{ color: 'var(--error)', fontSize: 12, marginTop: 8 }}>{error}</div>}
-          <button onClick={submitPredictions} disabled={submitting} style={{ width: '100%', marginTop: 10 }}>
-            {submitting ? 'Submitting…' : isResubmit ? 'Update Predictions' : 'Lock In Predictions'}
+          <button onClick={submitPredictions} disabled={submitting} style={{ width: '100%', fontWeight: 700, fontSize: 15, color: 'var(--gold)', marginTop: 10, backgroundColor: 'var(--zone-gold-bg)', padding: '12px 0', border: '2px solid var(--zone-gold-border)', borderRadius: 6, cursor: 'pointer' }}>
+            {submitting ? 'Submitting…' : isResubmit ? 'Update Predictions' : 'LOCK IN PREDICTIONS'}
           </button>
         </div>
       )}
