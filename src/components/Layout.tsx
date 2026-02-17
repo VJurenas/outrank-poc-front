@@ -43,13 +43,14 @@ export default function Layout({ children }: { children: ReactNode }) {
       <Sidebar />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
-        {/* Top bar */}
+        {/* Top bar — spans full width above both main and community panel */}
         <header style={{
           height: 64, minHeight: 64,
           display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
           gap: 8,
           padding: '0 20px',
           background: 'var(--surface)',
+          borderBottom: '1px solid var(--border)',
         }}>
           {user && <RankBalance token={user.sessionToken} />}
 
@@ -76,13 +77,15 @@ export default function Layout({ children }: { children: ReactNode }) {
           <UserMenu />
         </header>
 
-        {/* Main content */}
-        <main style={{ flex: 1, overflow: 'auto', padding: 24 }}>
-          {children}
-        </main>
-      </div>
+        {/* Below-header row: main content + community panel side by side */}
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+          <main style={{ flex: 1, overflow: 'auto', padding: 24 }}>
+            {children}
+          </main>
 
-      <CommunityPanel />
+          <CommunityPanel />
+        </div>
+      </div>
 
       {signInOpen && <WalletSignIn />}
     </div>
