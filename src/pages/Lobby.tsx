@@ -28,6 +28,162 @@ function formatMs(ms: number) {
   return `${m}:${ss.toString().padStart(2, '0')}`
 }
 
+// ─── Prediction Distribution Histogram ──────────────────────────────────────
+
+type HistogramProps = {
+  allPredictions: { alias: string; interval_label: string; predicted_price: number }[]
+  intervals: string[]
+  currentPrice: number | null
+}
+
+function PredictionHistogram({ allPredictions, intervals, currentPrice }: HistogramProps) {
+  const [activeInterval, setActiveInterval] = useState<string>(() => intervals[0] ?? '')
+
+  // Sync active interval when game mode loads
+  useEffect(() => {
+    if (intervals.length > 0 && !intervals.includes(activeInterval)) {
+      setActiveInterval(intervals[0])
+    }
+  }, [intervals, activeInterval])
+
+  const prices = useMemo(
+    () => allPredictions.filter(p => p.interval_label === activeInterval).map(p => p.predicted_price),
+    [allPredictions, activeInterval],
+  )
+
+  const playerCount = new Set(allPredictions.map(p => p.alias)).size
+
+  // SVG layout
+  const SVG_W = 380, SVG_H = 180
+  const L = 68, R = 36, T = 10, B = 10
+  const chartW = SVG_W - L - R
+  const chartH = SVG_H - T - B
+
+  const hist = useMemo(() => {
+    if (prices.length === 0) return null
+    const n = prices.length
+    const k = Math.max(3, Math.min(10, Math.ceil(1 + Math.log2(n))))
+    const minP = Math.min(...prices)
+    const maxP = Math.max(...prices)
+    const spread = maxP - minP
+    // Bucket width: based on spread, or ±0.2% of price if all identical
+    const bw = spread === 0 ? (minP * 0.002 || 1) : spread / k
+    // Bucket start: centre on the single price when spread=0
+    const bStart = spread === 0 ? minP - bw * Math.floor(k / 2) : minP
+    const buckets = Array.from({ length: k }, (_, i) => {
+      const lo = bStart + i * bw
+      const hi = lo + bw
+      const count = prices.filter(p => p >= lo && (i === k - 1 ? p <= hi : p < hi)).length
+      return { lo, hi, count }
+    })
+    const maxCount = Math.max(...buckets.map(b => b.count), 1)
+    // Display range: union of bucket range + current price, with 15% padding
+    const allVals = currentPrice !== null ? [...prices, currentPrice] : prices
+    const dispMin = Math.min(...allVals, bStart)
+    const dispMax = Math.max(...allVals, bStart + k * bw)
+    const pad = (dispMax - dispMin) * 0.15 || bw * 0.5
+    const rangeMin = dispMin - pad
+    const rangeSpan = (dispMax + pad) - rangeMin
+    return { buckets, maxCount, rangeMin, rangeSpan }
+  }, [prices, currentPrice])
+
+  const priceToY = (p: number) =>
+    hist ? T + chartH * (1 - (p - hist.rangeMin) / hist.rangeSpan) : 0
+  const countToBarW = (c: number) =>
+    hist ? (c / hist.maxCount) * chartW : 0
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <span style={{ color: 'var(--muted)', fontSize: 12 }}>
+          Prediction distribution · {playerCount} player{playerCount !== 1 ? 's' : ''} locked in
+        </span>
+        {intervals.length > 1 && (
+          <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
+            {intervals.map(iv => (
+              <button
+                key={iv}
+                onClick={() => setActiveInterval(iv)}
+                style={{
+                  fontSize: 11, padding: '2px 8px', borderRadius: 3, cursor: 'pointer',
+                  background: iv === activeInterval ? 'var(--surface-2)' : 'transparent',
+                  border: `1px solid ${iv === activeInterval ? 'var(--muted)' : 'var(--border)'}`,
+                  color: iv === activeInterval ? 'var(--text)' : 'var(--muted)',
+                }}
+              >
+                {iv}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
+        <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ width: '100%', display: 'block' }}>
+          {!hist ? (
+            <text x={SVG_W / 2} y={SVG_H / 2 + 4} textAnchor="middle" fontSize={11}
+              style={{ fill: 'var(--muted)' }}>
+              No predictions yet for {activeInterval}
+            </text>
+          ) : (
+            <>
+              {hist.buckets.map((b, i) => {
+                const y1 = priceToY(b.hi)     // top of bar (small y = high on screen)
+                const y2 = priceToY(b.lo)     // bottom of bar
+                const bh = Math.max(1, y2 - y1 - 1)   // 1px gap between bars
+                const barWidth = countToBarW(b.count)
+                const midY = (y1 + y2) / 2
+                return (
+                  <g key={i}>
+                    {b.count > 0 && (
+                      <rect x={L} y={y1} width={barWidth} height={bh}
+                        style={{ fill: 'var(--accent)', opacity: 0.35 }} />
+                    )}
+                    {/* Bucket lower-boundary price label */}
+                    <text x={L - 4} y={y2 + 3.5} textAnchor="end" fontSize={9}
+                      style={{ fill: 'var(--muted)' }}>
+                      {b.lo.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </text>
+                    {/* Count label at bar tip */}
+                    {b.count > 0 && (
+                      <text x={L + barWidth + 4} y={midY + 3.5} textAnchor="start" fontSize={9}
+                        style={{ fill: 'var(--muted)' }}>
+                        {b.count}
+                      </text>
+                    )}
+                  </g>
+                )
+              })}
+              {/* Upper boundary label for the topmost bucket */}
+              <text
+                x={L - 4}
+                y={priceToY(hist.buckets[hist.buckets.length - 1].hi) + 3.5}
+                textAnchor="end" fontSize={9} style={{ fill: 'var(--muted)' }}
+              >
+                {hist.buckets[hist.buckets.length - 1].hi.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </text>
+              {/* Current price dashed line */}
+              {currentPrice !== null && (() => {
+                const cy = priceToY(currentPrice)
+                return (
+                  <>
+                    <line x1={L} y1={cy} x2={SVG_W - R} y2={cy}
+                      strokeWidth={1.5} strokeDasharray="4 3"
+                      style={{ stroke: 'var(--accent-2)' }} />
+                    <text x={SVG_W - R + 3} y={cy + 3.5} textAnchor="start" fontSize={9}
+                      style={{ fill: 'var(--accent-2)' }}>
+                      {currentPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </text>
+                  </>
+                )
+              })()}
+            </>
+          )}
+        </svg>
+      </div>
+    </div>
+  )
+}
+
 export default function Lobby() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -316,7 +472,7 @@ export default function Lobby() {
 
           {error && <div style={{ color: 'var(--error)', fontSize: 12, marginTop: 8 }}>{error}</div>}
           <button onClick={handleLockInClick} disabled={submitting} style={{ width: '100%', fontWeight: 700, fontSize: 15, color: 'var(--gold)', marginTop: 10, backgroundColor: 'var(--zone-gold-bg)', padding: '12px 0', border: '2px solid var(--zone-gold-border)', borderRadius: 6, cursor: 'pointer' }}>
-            {submitting ? 'Submitting…' : isResubmit ? 'Update Predictions' : 'LOCK IN PREDICTIONS'}
+            {submitting ? 'Submitting…' : isResubmit ? 'UPDATE PREDICTIONS' : 'SUBMIT PREDICTIONS'}
           </button>
         </div>
       )}
@@ -426,21 +582,11 @@ export default function Lobby() {
       )}
 
       {allPredictions.length > 0 && (
-        <div style={{ marginTop: 16 }}>
-          <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 6 }}>
-            Players locked in ({new Set(allPredictions.map(p => p.alias)).size})
-          </div>
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
-            {Array.from(new Set(allPredictions.map(p => p.alias))).map(a => (
-              <div key={a} style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
-                <span>{a}</span>
-                <span style={{ color: 'var(--muted)', fontSize: 12 }}>
-                  {allPredictions.filter(p => p.alias === a).map(p => `${p.interval_label}: $${p.predicted_price.toLocaleString()}`).join(' · ')}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <PredictionHistogram
+          allPredictions={allPredictions}
+          intervals={intervals}
+          currentPrice={livePrice}
+        />
       )}
     </div>
   )
