@@ -15,7 +15,7 @@ function startTime(game: GameInfo): string {
 }
 
 function isCompeting(slug: string): boolean {
-  return !!localStorage.getItem(`session-${slug}`)
+  return !!localStorage.getItem(`predictions-${slug}`)
 }
 
 /** For each asset, pick the lobby game with the nearest kickoff. */

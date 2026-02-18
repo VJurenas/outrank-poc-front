@@ -14,7 +14,7 @@ function startTime(game: GameInfo): string {
 }
 
 function isCompeting(slug: string): boolean {
-  return !!localStorage.getItem(`session-${slug}`)
+  return !!localStorage.getItem(`predictions-${slug}`)
 }
 
 export default function Leagues() {
