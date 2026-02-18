@@ -96,7 +96,7 @@ function PredictionHistogram({ allPredictions, intervals, currentPrice }: Histog
     <div style={{ marginTop: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
         <span style={{ color: 'var(--muted)', fontSize: 12 }}>
-          Prediction distribution · {playerCount} player{playerCount !== 1 ? 's' : ''} locked in
+          Prediction distribution · {playerCount} player{playerCount !== 1 ? 's' : ''}
         </span>
         {intervals.length > 1 && (
           <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>

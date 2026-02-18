@@ -91,7 +91,7 @@ function MenuItem({ label, onClick, danger }: { label: string; onClick: () => vo
       onMouseLeave={() => setHover(false)}
       style={{
         display: 'block', width: '100%', textAlign: 'left',
-        padding: '10px 14px', background: hover ? '#222' : 'transparent',
+        padding: '10px 14px', background: hover ? 'var(--surface-2)' : 'transparent',
         border: 'none', cursor: 'pointer',
         color: danger ? '#f66' : 'var(--text)',
         fontSize: 14,

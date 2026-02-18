@@ -5,6 +5,7 @@ import { useGameWs } from '../hooks/useGameWs.ts'
 import { useCommunity } from '../contexts/CommunityContext.tsx'
 import PriceChart from '../components/PriceChart.tsx'
 import Leaderboard from '../components/Leaderboard.tsx'
+import RaceTrack, { type RankSnapshot } from '../components/RaceTrack.tsx'
 
 type Session = { playerId: string; sessionToken: string; alias: string }
 
@@ -28,6 +29,8 @@ export default function Game() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [tracked, setTracked] = useState<Set<string>>(new Set())
   const [lastCheckpoint, setLastCheckpoint] = useState<string | undefined>()
+  const [activeTab, setActiveTab] = useState<'chart' | 'race'>('chart')
+  const [rankHistory, setRankHistory] = useState<RankSnapshot[]>([])
   const prevZone = useRef<string | undefined>()
 
   // Fetch game info if not in state
@@ -41,9 +44,13 @@ export default function Game() {
       setLeaderboard(players)
       if (checkpoint) setLastCheckpoint(checkpoint)
 
-      // Zone change sound (if zone changed for current player)
       if (session) {
         const me = players.find(p => p.playerId === session.playerId)
+        // Record rank snapshot for RaceTrack
+        if (me) {
+          setRankHistory(prev => [...prev, { t: Date.now(), rank: me.rank, total: players.length }])
+        }
+        // Zone change sound
         if (me && me.zone !== prevZone.current) {
           prevZone.current = me.zone
           playZoneSound(me.zone)
@@ -98,12 +105,38 @@ export default function Game() {
           )}
         </div>
 
-        <PriceChart
-          asset={game.asset}
-          latestPrice={latestPrice}
-          predictions={chartPredictions}
-          height={360}
-        />
+        {/* Tab toggle */}
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
+          {(['chart', 'race'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                padding: '6px 18px', fontSize: 13, background: 'transparent', border: 'none',
+                borderBottom: `2px solid ${activeTab === tab ? 'var(--accent)' : 'transparent'}`,
+                color: activeTab === tab ? 'var(--text)' : 'var(--muted)',
+                cursor: 'pointer', marginBottom: -1,
+              }}
+            >
+              {tab === 'chart' ? 'Price Chart' : 'Race Track'}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'chart' ? (
+          <PriceChart
+            asset={game.asset}
+            latestPrice={latestPrice}
+            predictions={chartPredictions}
+            height={360}
+          />
+        ) : (
+          <RaceTrack
+            history={rankHistory}
+            myEntry={myEntry}
+            total={leaderboard.length}
+          />
+        )}
 
         {myEntry && (
           <div style={{
