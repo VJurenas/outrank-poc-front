@@ -479,22 +479,23 @@ export default function Lobby() {
 
       {session && submitted && (
         <div style={{
-              background: 'var(--success-bg)', border: '1px solid var(--success-border)', 
+              background: 'var(--success-bg)', border: '1px solid var(--success-border)',
               borderRadius: 8, padding: 16, marginBottom: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ marginBottom: 8 }}>
             <span style={{ color: 'var(--success-text)' }}>Predictions locked in!</span>
+          </div>
 
-
-          {intervals.map(label => {
-            const stored = (JSON.parse(localStorage.getItem(`predictions-${id}`) ?? '[]') as Prediction[])
-              .find(p => p.intervalLabel === label)
-            return stored ? (
-              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', fontSize: 13, marginBottom: 4 }}>
-                <span style={{ marginRight: 10 }}>{label}</span>
-                <span style={{ color: 'var(--text)' }}>${stored.predictedPrice.toLocaleString()}</span>
-              </div>
-            ) : null
-          })}
+          <div style={{ marginBottom: 8 }}>
+            {intervals.map(label => {
+              const stored = (JSON.parse(localStorage.getItem(`predictions-${id}`) ?? '[]') as Prediction[])
+                .find(p => p.intervalLabel === label)
+              return stored ? (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--muted)', fontSize: 13, marginBottom: 4 }}>
+                  <span style={{ marginRight: 10 }}>{label}</span>
+                  <span style={{ color: 'var(--text)' }}>${stored.predictedPrice.toLocaleString()}</span>
+                </div>
+              ) : null
+            })}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text)', fontSize: 12, marginTop: 8 }}>
             <span>Staked <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{intervals.length * STAKE_PER_PREDICTION} RANK</span> · Waiting for kickoff…</span>
