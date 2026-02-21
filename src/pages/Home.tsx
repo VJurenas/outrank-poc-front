@@ -18,22 +18,32 @@ function isCompeting(slug: string): boolean {
   return !!localStorage.getItem(`predictions-${slug}`)
 }
 
-/** For each asset, pick the lobby game with the nearest kickoff. */
-function nextPerAsset(games: GameInfo[]): GameInfo[] {
+/** For each asset+mode, pick the lobby game with the nearest kickoff. */
+function nextPerAssetAndMode(games: GameInfo[]): GameInfo[] {
   const map = new Map<string, GameInfo>()
   for (const g of games) {
-    const existing = map.get(g.asset)
+    const key = `${g.asset}:${g.mode}`
+    const existing = map.get(key)
     if (!existing || new Date(g.kickoff_at) < new Date(existing.kickoff_at)) {
-      map.set(g.asset, g)
+      map.set(key, g)
     }
   }
-  return ASSETS.map(a => map.get(a)).filter(Boolean) as GameInfo[]
+  const result: GameInfo[] = []
+  for (const asset of ASSETS) {
+    const game15 = map.get(`${asset}:15min`)
+    const game60 = map.get(`${asset}:60min`)
+    if (game15) result.push(game15)
+    if (game60) result.push(game60)
+  }
+  return result
 }
 
 export default function Home() {
   const [live, setLive] = useState<GameInfo[]>([])
   const [upcoming, setUpcoming] = useState<GameInfo[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set(ASSETS))
+  const [selectedModes, setSelectedModes] = useState<Set<string>>(new Set(['15min', '60min']))
 
   async function fetchAll() {
     const [l, u] = await Promise.all([
@@ -41,7 +51,7 @@ export default function Home() {
       getGames({ status: 'lobby' }),
     ])
     setLive(l)
-    setUpcoming(nextPerAsset(u))
+    setUpcoming(nextPerAssetAndMode(u))
   }
 
   useEffect(() => {
@@ -50,14 +60,68 @@ export default function Home() {
     return () => clearInterval(interval)
   }, [])
 
+  const toggleAsset = (asset: string) => {
+    setSelectedAssets(prev => {
+      const next = new Set(prev)
+      if (next.has(asset)) next.delete(asset)
+      else next.add(asset)
+      return next
+    })
+  }
+
+  const toggleMode = (mode: string) => {
+    setSelectedModes(prev => {
+      const next = new Set(prev)
+      if (next.has(mode)) next.delete(mode)
+      else next.add(mode)
+      return next
+    })
+  }
+
+  const toggleAll = () => {
+    const allSelected = selectedAssets.size === ASSETS.length && selectedModes.size === 2
+    if (allSelected) {
+      setSelectedAssets(new Set())
+      setSelectedModes(new Set())
+    } else {
+      setSelectedAssets(new Set(ASSETS))
+      setSelectedModes(new Set(['15min', '60min']))
+    }
+  }
+
+  const filterGames = (games: GameInfo[]) =>
+    games.filter(g => selectedAssets.has(g.asset) && selectedModes.has(g.mode))
+
+  const filteredLive = filterGames(live)
+  const filteredUpcoming = filterGames(upcoming)
+
+  const allSelected = selectedAssets.size === ASSETS.length && selectedModes.size === 2
+
   return (
     <div>
       {loading && <p style={{ color: 'var(--muted)' }}>Loading…</p>}
 
+      {/* Filter Tags */}
+      <div style={{ marginBottom: 24, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <FilterTag label="All" active={allSelected} onClick={toggleAll} />
+        <div style={{ width: 1, height: 24, background: 'var(--border)', margin: '0 4px' }} />
+        {ASSETS.map(asset => (
+          <FilterTag
+            key={asset}
+            label={asset}
+            active={selectedAssets.has(asset)}
+            onClick={() => toggleAsset(asset)}
+          />
+        ))}
+        <div style={{ width: 1, height: 24, background: 'var(--border)', margin: '0 4px' }} />
+        <FilterTag label="15min" active={selectedModes.has('15min')} onClick={() => toggleMode('15min')} />
+        <FilterTag label="60min" active={selectedModes.has('60min')} onClick={() => toggleMode('60min')} />
+      </div>
+
       {/* Live Leagues */}
       <h1 style={{ margin: '0 0 16px', fontSize: 21 }}>Live Leagues</h1>
 
-      {!loading && live.length === 0 && (
+      {!loading && filteredLive.length === 0 && (
         <div style={{
           padding: 24, textAlign: 'center',
           border: '1px dashed var(--border)', borderRadius: 8,
@@ -67,18 +131,18 @@ export default function Home() {
         </div>
       )}
 
-      {live.length > 0 && (
+      {filteredLive.length > 0 && (
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
           gap: 16, marginBottom: 40,
         }}>
-          {live.map(game => <LeagueCard key={game.id} game={game} timeLabel={`Ends at ${endTime(game)}`} isLive />)}
+          {filteredLive.map(game => <LeagueCard key={game.id} game={game} timeLabel={`Ends at ${endTime(game)}`} isLive />)}
         </div>
       )}
 
       {/* Upcoming Leagues */}
-      {upcoming.length > 0 && (
+      {filteredUpcoming.length > 0 && (
         <>
           <h2 style={{ margin: '0 0 16px', fontSize: 21 }}>Upcoming Leagues</h2>
           <div style={{
@@ -86,7 +150,7 @@ export default function Home() {
             gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
             gap: 16,
           }}>
-            {upcoming.map(game => <LeagueCard key={game.id} game={game} timeLabel={`Starts at ${startTime(game)}`} isLive={false} />)}
+            {filteredUpcoming.map(game => <LeagueCard key={game.id} game={game} timeLabel={`Starts at ${startTime(game)}`} isLive={false} />)}
           </div>
         </>
       )}
@@ -155,5 +219,32 @@ function LeagueCard({ game, timeLabel, isLive }: { game: GameInfo; timeLabel: st
         </div>
       </div>
     </Link>
+  )
+}
+
+function FilterTag({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: '6px 14px',
+        fontSize: 13,
+        fontWeight: active ? 600 : 500,
+        color: active ? 'var(--accent)' : 'var(--muted)',
+        background: active ? 'var(--accent-bg)' : 'var(--surface)',
+        border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+        borderRadius: 20,
+        cursor: 'pointer',
+        transition: 'all 0.15s',
+      }}
+      onMouseEnter={e => {
+        if (!active) e.currentTarget.style.borderColor = 'var(--accent)'
+      }}
+      onMouseLeave={e => {
+        if (!active) e.currentTarget.style.borderColor = 'var(--border)'
+      }}
+    >
+      {label}
+    </button>
   )
 }

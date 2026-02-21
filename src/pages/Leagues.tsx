@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getGames, type GameInfo } from '../lib/api.ts'
+import { ASSETS } from '../lib/assets.ts'
 import { AssetIcon } from '../components/Icons.tsx'
 
 function endTime(game: GameInfo): string {
@@ -21,30 +22,74 @@ export default function Leagues() {
   const { mode } = useParams<{ mode: string }>()
   const [games, setGames] = useState<GameInfo[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set(ASSETS))
 
   const modeKey = mode === '60min' ? '60min' : '15min'
   const modeLabel = modeKey === '15min' ? '15 Minutes' : '1 Hour'
 
+  async function fetchGames() {
+    const g = await getGames({ mode: modeKey })
+    setGames(g.filter(x => x.status !== 'ended'))
+  }
+
   useEffect(() => {
     setLoading(true)
-    getGames({ mode: modeKey })
-      .then(g => setGames(g.filter(x => x.status !== 'ended')))
-      .catch(console.error)
-      .finally(() => setLoading(false))
+    fetchGames().catch(console.error).finally(() => setLoading(false))
+    const interval = setInterval(() => fetchGames().catch(() => {}), 15_000)
+    return () => clearInterval(interval)
   }, [modeKey])
 
-  const live = games.filter(g => g.status === 'live')
+  const toggleAsset = (asset: string) => {
+    setSelectedAssets(prev => {
+      const next = new Set(prev)
+      if (next.has(asset)) next.delete(asset)
+      else next.add(asset)
+      return next
+    })
+  }
+
+  const toggleAll = () => {
+    const allSelected = selectedAssets.size === ASSETS.length
+    if (allSelected) {
+      setSelectedAssets(new Set())
+    } else {
+      setSelectedAssets(new Set(ASSETS))
+    }
+  }
+
+  const filterGames = (games: GameInfo[]) =>
+    games.filter(g => selectedAssets.has(g.asset))
+
+  const live = filterGames(games.filter(g => g.status === 'live'))
   // Sort upcoming ascending by kickoff time
-  const lobby = games
-    .filter(g => g.status === 'lobby')
-    .sort((a, b) => new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime())
+  const lobby = filterGames(
+    games
+      .filter(g => g.status === 'lobby')
+      .sort((a, b) => new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime())
+  )
+
+  const allSelected = selectedAssets.size === ASSETS.length
 
   return (
     <div>
       <h1 style={{ margin: '0 0 6px', fontSize: 22 }}>{modeLabel} League</h1>
-      <p style={{ color: 'var(--muted)', fontSize: 13, margin: '0 0 24px' }}>
+      <p style={{ color: 'var(--muted)', fontSize: 13, margin: '0 0 16px' }}>
         Join upcoming leagues or watch live rounds.
       </p>
+
+      {/* Filter Tags */}
+      <div style={{ marginBottom: 24, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <FilterTag label="All" active={allSelected} onClick={toggleAll} />
+        <div style={{ width: 1, height: 24, background: 'var(--border)', margin: '0 4px' }} />
+        {ASSETS.map(asset => (
+          <FilterTag
+            key={asset}
+            label={asset}
+            active={selectedAssets.has(asset)}
+            onClick={() => toggleAsset(asset)}
+          />
+        ))}
+      </div>
 
       {loading && <p style={{ color: 'var(--muted)' }}>Loading…</p>}
 
@@ -141,5 +186,31 @@ function GameRow({ game }: { game: GameInfo }) {
         </Link>
       )}
     </div>
+  )
+}
+function FilterTag({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: '6px 14px',
+        fontSize: 13,
+        fontWeight: active ? 600 : 500,
+        color: active ? 'var(--accent)' : 'var(--muted)',
+        background: active ? 'var(--accent-bg)' : 'var(--surface)',
+        border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+        borderRadius: 20,
+        cursor: 'pointer',
+        transition: 'all 0.15s',
+      }}
+      onMouseEnter={e => {
+        if (!active) e.currentTarget.style.borderColor = 'var(--accent)'
+      }}
+      onMouseLeave={e => {
+        if (!active) e.currentTarget.style.borderColor = 'var(--border)'
+      }}
+    >
+      {label}
+    </button>
   )
 }
