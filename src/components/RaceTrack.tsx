@@ -9,8 +9,8 @@ type Props = {
 }
 
 const SVG_W = 900
-const SVG_H = 300
-const L = 44, R = 16, T = 12, B = 28
+const SVG_H = 360
+const L = 1, R = 50, T = 12, B = 28
 const chartW = SVG_W - L - R
 const chartH = SVG_H - T - B
 
@@ -72,8 +72,8 @@ export default function RaceTrack({ history, myEntry, total }: Props) {
   const yLabels = yLabelRanks.map(rank => ({ rank, label: `#${rank}` }))
 
   return (
-    <div style={{ width: '100%' }}>
-      <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ width: '100%', display: 'block' }}>
+    <div style={{ width: '100%', height: '360px', minHeight: '360px', maxHeight: '360px', flexShrink: 0 }}>
+      <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ width: '100%', height: '360px', display: 'block' }} preserveAspectRatio="none">
 
         {/* ── Zone background bands ─────────────────────────────── */}
         <rect x={L} y={T}          width={chartW} height={goldBotY - T}            style={{ fill: 'var(--zone-gold-bg)' }} />
@@ -111,8 +111,8 @@ export default function RaceTrack({ history, myEntry, total }: Props) {
 
         {/* ── Y-axis rank labels ────────────────────────────────── */}
         {yLabels.map(({ rank, label }) => (
-          <text key={rank} x={L - 5} y={rankToY(rank) + 3.5}
-            textAnchor="end" fontSize={9} style={{ fill: 'var(--muted)' }}>
+          <text key={rank} x={L + chartW + 5} y={rankToY(rank) + 3.5}
+            textAnchor="start" fontSize={9} style={{ fill: 'var(--muted)' }}>
             {label}
           </text>
         ))}
@@ -126,7 +126,7 @@ export default function RaceTrack({ history, myEntry, total }: Props) {
         ))}
 
         {/* ── Axes ─────────────────────────────────────────────── */}
-        <line x1={L} y1={T} x2={L} y2={T + chartH}
+        <line x1={L + chartW} y1={T} x2={L + chartW} y2={T + chartH}
           style={{ stroke: 'var(--chart-border)', opacity: 0.4 }} />
         <line x1={L} y1={T + chartH} x2={L + chartW} y2={T + chartH}
           style={{ stroke: 'var(--chart-border)', opacity: 0.4 }} />

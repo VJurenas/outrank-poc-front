@@ -125,7 +125,7 @@ export default function Game() {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16, height: '100%', padding: 16 }}>
       {/* Left: chart + status */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <span style={{ fontSize: 18, fontWeight: 700 }}>outrank.xyz</span>
           <span style={{ color: 'var(--muted)' }}>{game.asset} · {game.mode === '15min' ? '15min' : '60min'}</span>
