@@ -88,11 +88,11 @@ export default function RaceTrack({ history, myEntry, total }: Props) {
 
         {/* ── Zone labels (right-aligned inside band) ───────────── */}
         <text x={L + chartW - 6} y={T + (goldBotY - T) / 2 + 4}
-          textAnchor="end" fontSize={10} style={{ fill: 'var(--gold)', opacity: 0.7 }}>GOLD</text>
+          textAnchor="end" fontSize={12} style={{ fill: 'var(--gold)', opacity: 0.7 }}>GOLD</text>
         <text x={L + chartW - 6} y={goldBotY + (silverBotY - goldBotY) / 2 + 4}
-          textAnchor="end" fontSize={10} style={{ fill: 'var(--silver)', opacity: 0.7 }}>SILVER</text>
+          textAnchor="end" fontSize={12} style={{ fill: 'var(--silver)', opacity: 0.7 }}>SILVER</text>
         <text x={L + chartW - 6} y={silverBotY + (T + chartH - silverBotY) / 2 + 4}
-          textAnchor="end" fontSize={10} style={{ fill: 'var(--dead)', opacity: 0.7 }}>DEAD</text>
+          textAnchor="end" fontSize={12} style={{ fill: 'var(--dead)', opacity: 0.7 }}>DEAD</text>
 
         {/* ── Rank line ─────────────────────────────────────────── */}
         <polyline
@@ -112,7 +112,7 @@ export default function RaceTrack({ history, myEntry, total }: Props) {
         {/* ── Y-axis rank labels ────────────────────────────────── */}
         {yLabels.map(({ rank, label }) => (
           <text key={rank} x={L + chartW + 5} y={rankToY(rank) + 3.5}
-            textAnchor="start" fontSize={9} style={{ fill: 'var(--muted)' }}>
+            textAnchor="start" fontSize={12} style={{ fill: 'var(--muted)' }}>
             {label}
           </text>
         ))}
@@ -120,7 +120,7 @@ export default function RaceTrack({ history, myEntry, total }: Props) {
         {/* ── X-axis time labels ────────────────────────────────── */}
         {timeLabels.map(({ x, label }) => (
           <text key={label} x={x} y={T + chartH + 16}
-            textAnchor="middle" fontSize={9} style={{ fill: 'var(--muted)' }}>
+            textAnchor="middle" fontSize={12} style={{ fill: 'var(--muted)' }}>
             {label}
           </text>
         ))}
