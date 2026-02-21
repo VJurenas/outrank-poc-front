@@ -24,6 +24,10 @@ type Props = {
   onPriceClick?: (price: number) => void
   /** When true, mouse-wheel / touchpad scroll zooms the y-axis only. */
   enableYZoom?: boolean
+  /** Game mode - used to calculate prediction opacity in 60min games */
+  mode?: '15min' | '60min'
+  /** Kickoff timestamp - used to filter out past predictions */
+  kickoffAt?: string
 }
 
 const WINDOW_SECONDS = 5 * 60   // 5-minute sliding window
@@ -43,6 +47,16 @@ function zoneColor(zone?: 'gold' | 'silver' | 'dead'): string {
   return readVar('--chart-pred')
 }
 
+/** Converts hex color to rgba with specified opacity */
+function withOpacity(hexColor: string, opacity: number): string {
+  // Remove # if present
+  const hex = hexColor.replace('#', '')
+  const r = parseInt(hex.substring(0, 2), 16)
+  const g = parseInt(hex.substring(2, 4), 16)
+  const b = parseInt(hex.substring(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`
+}
+
 // Stores the live price line handle plus the original (unclamped) prediction data.
 type PredLine = {
   line: ReturnType<ISeriesApi<'Line'>['createPriceLine']>
@@ -52,7 +66,7 @@ type PredLine = {
   isClamped: boolean   // tracks current state so we only call applyOptions on transitions
 }
 
-export default function PriceChart({ asset, latestPrice, predictions = [], height = 320, onPriceClick, enableYZoom }: Props) {
+export default function PriceChart({ asset, latestPrice, predictions = [], height = 320, onPriceClick, enableYZoom, mode, kickoffAt }: Props) {
   const containerRef  = useRef<HTMLDivElement>(null)
   const chartRef      = useRef<IChartApi | null>(null)
   const seriesRef     = useRef<ISeriesApi<'Line'> | null>(null)
@@ -80,19 +94,43 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
   function applyPredictionLines(preds: ChartPrediction[]) {
     if (!seriesRef.current) return
     for (const { line } of predLinesRef.current) seriesRef.current.removePriceLine(line)
-    predLinesRef.current = preds
+
+    const now = Date.now()
+    const kickoffMs = kickoffAt ? new Date(kickoffAt).getTime() : 0
+
+    // Filter and process predictions
+    const visiblePreds = preds
       .filter(p => p.price > 0)
       .map(p => {
-        const line = seriesRef.current!.createPriceLine({
-          price:            p.price,
-          color:            zoneColor(p.zone),
-          lineWidth:        1,
-          lineStyle:        LineStyle.Dashed,
-          axisLabelVisible: true,
-          title:            p.label,
-        })
-        return { line, originalPrice: p.price, label: p.label, zone: p.zone, isClamped: false }
+        // Extract minutes from label (e.g., "T+15" -> 15)
+        const minutes = parseInt(p.label.replace('T+', ''))
+        const checkpointTime = kickoffMs + minutes * 60_000
+        return { ...p, minutes, checkpointTime }
       })
+      // Only filter by time if kickoffAt is provided (live game); in lobby, show all
+      .filter(p => !kickoffAt || p.checkpointTime > now)
+      .sort((a, b) => a.minutes - b.minutes)  // Sort by time (nearest first)
+
+    predLinesRef.current = visiblePreds.map((p, index) => {
+      const baseColor = zoneColor(p.zone)
+
+      // Calculate opacity: nearest = 1.0, then 0.7, 0.5, 0.3
+      let opacity = 1.0
+      if (mode === '60min' && visiblePreds.length > 1) {
+        const opacitySteps = [1.0, 0.7, 0.5, 0.3]
+        opacity = opacitySteps[index] ?? 0.3
+      }
+
+      const line = seriesRef.current!.createPriceLine({
+        price:            p.price,
+        color:            withOpacity(baseColor, opacity),
+        lineWidth:        1,
+        lineStyle:        LineStyle.Dashed,
+        axisLabelVisible: true,
+        title:            p.label,
+      })
+      return { line, originalPrice: p.price, label: p.label, zone: p.zone, isClamped: false }
+    })
   }
 
   // Called every animation frame. Clamps each prediction line to the currently
