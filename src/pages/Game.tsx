@@ -38,6 +38,7 @@ export default function Game() {
     zone: 'gold' | 'silver' | 'dead'
   }[]>([])
   const prevZone = useRef<string | undefined>()
+  const kickoffAt = game ? new Date(game.kickoff_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
 
   // Fetch game info if not in state
   useEffect(() => {
@@ -127,8 +128,9 @@ export default function Game() {
       {/* Left: chart + status */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ fontSize: 18, fontWeight: 700 }}>outrank.xyz</span>
-          <span style={{ color: 'var(--muted)' }}>{game.asset} · {game.mode === '15min' ? '15min' : '60min'}</span>
+          <span style={{ color: 'var(--text)', fontSize: 18, fontWeight: 700 }}>
+            {game.asset} · {game.mode === '15min' ? '15min' : '60min'} · {kickoffAt} Kickoff
+          </span>
           {game.status === 'ended' && <span style={{ color: '#f5c518' }}>Game Over</span>}
           {lastCheckpoint && (
             <span style={{ color: 'var(--muted)', fontSize: 12 }}>Last checkpoint: {lastCheckpoint}</span>
