@@ -14,7 +14,7 @@ function RankBalance({ token }: { token: string }) {
   useEffect(() => {
     const fetch = () => getBalance(token).then(r => setBalance(r.balance)).catch(() => {})
     fetch()
-    const id = setInterval(fetch, 15_000)
+    const id = setInterval(fetch, 2_000)
     return () => clearInterval(id)
   }, [token])
 
