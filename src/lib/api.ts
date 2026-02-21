@@ -132,6 +132,11 @@ export const api = {
     json<{ alias: string; interval_label: string; predicted_price: number }[]>(`/games/${id}/predictions`),
 
   getLeaderboard: (id: string) => json<LeaderboardEntry[]>(`/games/${id}/leaderboard`),
+
+  getCheckpointResults: (slug: string, playerId: string) =>
+    json<{ checkpoint: string; rank: number; distance: number; zone: 'gold' | 'silver' | 'dead' }[]>(
+      `/games/${slug}/checkpoints/${playerId}`
+    ),
 }
 
 // ─── Community ────────────────────────────────────────────────────────────────

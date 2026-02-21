@@ -31,12 +31,29 @@ export default function Game() {
   const [lastCheckpoint, setLastCheckpoint] = useState<string | undefined>()
   const [activeTab, setActiveTab] = useState<'chart' | 'race'>('chart')
   const [rankHistory, setRankHistory] = useState<RankSnapshot[]>([])
+  const [checkpointResults, setCheckpointResults] = useState<{
+    checkpoint: string
+    rank: number
+    distance: number
+    zone: 'gold' | 'silver' | 'dead'
+  }[]>([])
   const prevZone = useRef<string | undefined>()
 
   // Fetch game info if not in state
   useEffect(() => {
     if (!game && id) api.getGame(id).then(setGame).catch(() => {})
   }, [id, game])
+
+  // Fetch checkpoint results on mount (hydrate from DB)
+  useEffect(() => {
+    if (id && session?.playerId) {
+      api.getCheckpointResults(id, session.playerId)
+        .then(results => {
+          setCheckpointResults(results)
+        })
+        .catch(() => {})
+    }
+  }, [id, session?.playerId])
 
   useGameWs(id, session?.playerId, session?.sessionToken, {
     onPrice: (_, price) => setLatestPrice(price),
@@ -49,6 +66,19 @@ export default function Game() {
         // Record rank snapshot for RaceTrack
         if (me) {
           setRankHistory(prev => [...prev, { t: Date.now(), rank: me.rank, total: players.length }])
+        }
+        // Save checkpoint result when a checkpoint is completed
+        if (checkpoint && me) {
+          setCheckpointResults(prev => {
+            // Only add if not already recorded
+            if (prev.some(r => r.checkpoint === checkpoint)) return prev
+            return [...prev, {
+              checkpoint,
+              rank: me.rank,
+              distance: me.distance,
+              zone: me.zone,
+            }].sort((a, b) => a.checkpoint.localeCompare(b.checkpoint))
+          })
         }
         // Zone change sound
         if (me && me.zone !== prevZone.current) {
@@ -129,6 +159,8 @@ export default function Game() {
             latestPrice={latestPrice}
             predictions={chartPredictions}
             height={360}
+            mode={game.mode}
+            kickoffAt={game.kickoff_at}
           />
         ) : (
           <RaceTrack
@@ -139,32 +171,97 @@ export default function Game() {
         )}
 
         {myEntry && (
-          <div style={{
-            background: myEntry.zone === 'gold' ? 'var(--zone-gold-bg)' : myEntry.zone === 'silver' ? 'var(--zone-silver-bg)' : 'var(--zone-dead-bg)',
-            border: `1px solid ${myEntry.zone === 'gold' ? 'var(--zone-gold-border)' : 'var(--border)'}`,
-            borderRadius: 8,
-            padding: '12px 16px',
-            display: 'flex',
-            gap: 24,
-          }}>
-            <div>
-              <div style={{ color: 'var(--muted)', fontSize: 11 }}>Your rank</div>
-              <div style={{ fontSize: 24, fontWeight: 700 }}>#{myEntry.rank}</div>
-            </div>
-            <div>
-              <div style={{ color: 'var(--muted)', fontSize: 11 }}>Distance</div>
-              <div style={{ fontSize: 24, fontWeight: 700 }}>
-                {myEntry.distance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          <>
+            <div style={{
+              background: myEntry.zone === 'gold' ? 'var(--zone-gold-bg)' : myEntry.zone === 'silver' ? 'var(--zone-silver-bg)' : 'var(--zone-dead-bg)',
+              border: `1px solid ${myEntry.zone === 'gold' ? 'var(--zone-gold-border)' : 'var(--border)'}`,
+              borderRadius: 8,
+              padding: '12px 16px',
+              display: 'flex',
+              gap: 24,
+            }}>
+              <div>
+                <div style={{ color: 'var(--muted)', fontSize: 11 }}>Your rank</div>
+                <div style={{ fontSize: 24, fontWeight: 700 }}>#{myEntry.rank}</div>
+              </div>
+              <div>
+                <div style={{ color: 'var(--muted)', fontSize: 11 }}>Distance</div>
+                <div style={{ fontSize: 24, fontWeight: 700 }}>
+                  {myEntry.distance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div>
+                <div style={{ color: 'var(--muted)', fontSize: 11 }}>Zone</div>
+                <div style={{ fontSize: 24, fontWeight: 700, textTransform: 'capitalize',
+                  color: myEntry.zone === 'gold' ? 'var(--gold)' : myEntry.zone === 'silver' ? 'var(--silver)' : 'var(--dead)' }}>
+                  {myEntry.zone}
+                </div>
               </div>
             </div>
-            <div>
-              <div style={{ color: 'var(--muted)', fontSize: 11 }}>Zone</div>
-              <div style={{ fontSize: 24, fontWeight: 700, textTransform: 'capitalize',
-                color: myEntry.zone === 'gold' ? 'var(--gold)' : myEntry.zone === 'silver' ? 'var(--silver)' : 'var(--dead)' }}>
-                {myEntry.zone}
+
+            {/* Checkpoint results for 60min games */}
+            {game.mode === '60min' && (
+              <div style={{
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                padding: 12,
+              }}>
+                <div style={{ color: 'var(--muted)', fontSize: 11, marginBottom: 8 }}>CHECKPOINT RESULTS</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+                  {/* Individual checkpoint cards - show all 4 slots */}
+                  {['T+15', 'T+30', 'T+45', 'T+60'].map(label => {
+                    const result = checkpointResults.find(r => r.checkpoint === label)
+                    return (
+                      <div key={label} style={{
+                        background: result ? 'var(--surface)' : 'var(--surface-2)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 6,
+                        padding: 8,
+                        opacity: result ? 1 : 0.5,
+                      }}>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4 }}>{label}</div>
+                        {result ? (
+                          <div style={{ fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <div>Rank: <span style={{ fontWeight: 700 }}>#{result.rank}</span></div>
+                            <div>Dist: <span style={{ fontWeight: 700 }}>{result.distance.toFixed(2)}</span></div>
+                            <div>Zone: <span style={{
+                              fontWeight: 700,
+                              color: result.zone === 'gold' ? 'var(--gold)' : result.zone === 'silver' ? 'var(--silver)' : 'var(--dead)'
+                            }}>{result.zone}</span></div>
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 11, color: 'var(--muted)', fontStyle: 'italic' }}>Pending...</div>
+                        )}
+                      </div>
+                    )
+                  })}
+
+                  {/* Aggregate card - shown when at least 1 checkpoint is complete */}
+                  {checkpointResults.length >= 1 && (
+                    <div style={{
+                      background: 'var(--accent-bg)',
+                      border: '2px solid var(--accent)',
+                      borderRadius: 6,
+                      padding: 8,
+                    }}>
+                      <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 4, fontWeight: 700 }}>TOTAL</div>
+                      <div style={{ fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <div>Rank: <span style={{ fontWeight: 700 }}>#{myEntry.rank}</span></div>
+                        <div>Dist: <span style={{ fontWeight: 700 }}>
+                          {checkpointResults.reduce((sum, r) => sum + r.distance, 0).toFixed(2)}
+                        </span></div>
+                        <div>Zone: <span style={{
+                          fontWeight: 700,
+                          color: myEntry.zone === 'gold' ? 'var(--gold)' : myEntry.zone === 'silver' ? 'var(--silver)' : 'var(--dead)'
+                        }}>{myEntry.zone}</span></div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
+            )}
+          </>
         )}
       </div>
 

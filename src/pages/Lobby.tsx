@@ -385,6 +385,8 @@ export default function Lobby() {
           height={240}
           onPriceClick={session && !submitted ? handleChartPriceClick : undefined}
           enableYZoom={!!session && !submitted}
+          mode={game.mode}
+          kickoffAt={game.kickoff_at}
         />
       </div>
 
