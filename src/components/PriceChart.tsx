@@ -269,30 +269,27 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
     container.addEventListener('wheel', onWheel, { passive: false })
     ;(container as HTMLElement & { _onWheel?: (e: WheelEvent) => void })._onWheel = onWheel
 
-    // Load 5 min of history then set initial visible range
-    fetch(`/api/prices/history/${asset}`)
-      .then(r => r.json())
-      .then((ticks: { time: number; price: number }[]) => {
-        if (!seriesRef.current) return
-        for (const tick of ticks) {
-          seriesRef.current.update({ time: tick.time as UTCTimestamp, value: tick.price })
-        }
-        const t = Date.now() / 1000
-        chart.timeScale().setVisibleRange({
-          from: (Math.floor(t) - WINDOW_SECONDS) as UTCTimestamp,
-          to:   (Math.floor(t) + LOOKAHEAD)      as UTCTimestamp,
-        })
-        // Draw prediction lines after history is loaded so series is populated
-        applyPredictionLines(predictionsRef.current)
-      })
-      .catch(() => {})
+    // Buffer to store live prices that arrive before history is loaded
+    let historyLoaded = false
+    let bufferedPrice: number | undefined
 
     // 25 fps animation loop.
     // Series time is floored to whole seconds so data density matches the 1-pt/s history,
     // keeping the x-axis uniformly spaced. Calling update() 25×/s with the same integer
     // second just refreshes the current bar's value, giving smooth price animation.
     const loopId = setInterval(() => {
-      if (!seriesRef.current || latestPriceRef.current === undefined) return
+      if (!seriesRef.current) return
+
+      // Buffer live prices until history is loaded
+      if (!historyLoaded) {
+        if (latestPriceRef.current !== undefined) {
+          bufferedPrice = latestPriceRef.current
+        }
+        return
+      }
+
+      if (latestPriceRef.current === undefined) return
+
       const nowMs = Date.now()
       const t     = nowMs / 1000
       const tSec  = Math.floor(t) as UTCTimestamp   // 1 bar/second — uniform with history
@@ -303,6 +300,37 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
       })
       updatePredictionLinePrices()
     }, TICK_MS)
+
+    // Load 5 min of history then set initial visible range and start animation
+    fetch(`/api/prices/history/${asset}`)
+      .then(r => r.json())
+      .then((ticks: { time: number; price: number }[]) => {
+        if (!seriesRef.current) return
+        for (const tick of ticks) {
+          seriesRef.current.update({ time: tick.time as UTCTimestamp, value: tick.price })
+        }
+
+        // If we buffered a live price while waiting, add it now
+        if (bufferedPrice !== undefined) {
+          const nowSec = Math.floor(Date.now() / 1000) as UTCTimestamp
+          seriesRef.current.update({ time: nowSec, value: bufferedPrice })
+        }
+
+        const t = Date.now() / 1000
+        chart.timeScale().setVisibleRange({
+          from: (Math.floor(t) - WINDOW_SECONDS) as UTCTimestamp,
+          to:   (Math.floor(t) + LOOKAHEAD)      as UTCTimestamp,
+        })
+        // Draw prediction lines after history is loaded so series is populated
+        applyPredictionLines(predictionsRef.current)
+
+        // Mark history as loaded - animation loop can now proceed
+        historyLoaded = true
+      })
+      .catch(() => {
+        // Even if history load fails, allow animation loop to proceed
+        historyLoaded = true
+      })
 
     const ro = new ResizeObserver(() => {
       chart.applyOptions({ width: container.clientWidth })
