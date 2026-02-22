@@ -72,7 +72,7 @@ export default function UserMenu() {
           {user && (
             <>
               <MenuItem label="Profile" onClick={() => { setOpen(false); navigate('/profile') }} />
-              <MenuItem label="Performance" onClick={() => { setOpen(false); navigate('/performance') }} />
+              <MenuItem label="Portfolio" onClick={() => { setOpen(false); navigate('/performance') }} />
               <MenuItem label="Sign Out" onClick={handleSignOut} danger />
             </>
           )}

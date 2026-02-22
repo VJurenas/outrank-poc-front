@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { HomeIcon, TrophyIcon, MedalIcon, BubbleIcon, QuestionIcon, MenuIcon, ChevronIcon } from './Icons.tsx'
+import { HomeIcon, PortfolioIcon, TrophyIcon, MedalIcon, BubbleIcon, QuestionIcon, MenuIcon, ChevronIcon } from './Icons.tsx'
 import { useCommunity } from '../contexts/CommunityContext.tsx'
 
 function CommunityNavBtn({ collapsed }: { collapsed: boolean }) {
@@ -79,6 +79,7 @@ export default function Sidebar() {
       {/* Nav items */}
       <nav style={{ flex: 1, paddingTop: 8 }}>
         <NavItem to="/" icon={<HomeIcon />} label="Home" collapsed={collapsed} exact />
+        <NavItem to="/performance" icon={<PortfolioIcon />} label="Portfolio" collapsed={collapsed} />
 
         {/* Leagues with sub-items */}
         <div>
