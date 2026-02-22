@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { HomeIcon, PortfolioIcon, TrophyIcon, MedalIcon, BubbleIcon, QuestionIcon, MenuIcon, ChevronIcon } from './Icons.tsx'
 import { useCommunity } from '../contexts/CommunityContext.tsx'
+import EventsBox from './EventsBox.tsx'
 
 function CommunityNavBtn({ collapsed }: { collapsed: boolean }) {
   const { openTo } = useCommunity()
@@ -127,6 +128,13 @@ export default function Sidebar() {
         <CommunityNavBtn collapsed={collapsed} />
         <NavItem to="/help" icon={<QuestionIcon />} label="Help" collapsed={collapsed} />
       </nav>
+
+      {/* Events Box - only shown when expanded */}
+      {!collapsed && (
+        <div style={{ padding: '0 12px 12px' }}>
+          <EventsBox />
+        </div>
+      )}
     </aside>
   )
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.tsx'
-import { getPerformance, getGames, api, type PerformanceGame, type GameInfo } from '../lib/api.ts'
+import { getPerformance, getGames, getLedger, api, type PerformanceGame, type GameInfo, type LedgerEvent } from '../lib/api.ts'
 import { AssetIcon } from '../components/Icons.tsx'
 
 const ZONE_COLORS = { gold: 'var(--gold)', silver: 'var(--silver)', dead: 'var(--dead)' }
@@ -18,9 +18,10 @@ type ActiveGame = GameInfo & {
 export default function Performance() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<'portfolio' | 'history'>('portfolio')
+  const [activeTab, setActiveTab] = useState<'portfolio' | 'history' | 'events'>('portfolio')
   const [historyGames, setHistoryGames] = useState<PerformanceGame[]>([])
   const [activeGames, setActiveGames] = useState<ActiveGame[]>([])
+  const [ledgerEvents, setLedgerEvents] = useState<LedgerEvent[]>([])
   const [prices, setPrices] = useState<Record<string, number | null>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -33,6 +34,14 @@ export default function Performance() {
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [user, navigate])
+
+  // Fetch ledger events
+  useEffect(() => {
+    if (!user) return
+    getLedger(user.sessionToken, { limit: 100 })
+      .then(data => setLedgerEvents(data.events))
+      .catch(console.error)
+  }, [user])
 
   // Fetch active games (lobby + live) and filter to user's games
   useEffect(() => {
@@ -154,7 +163,7 @@ export default function Performance() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
-        {(['portfolio', 'history'] as const).map(tab => (
+        {(['portfolio', 'history', 'events'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -465,6 +474,118 @@ export default function Performance() {
                       {distance != null ? (
                         `${distance > 0 ? '+' : ''}${distance.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
                       ) : '—'}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Events Tab */}
+      {activeTab === 'events' && (
+        <>
+          {ledgerEvents.length === 0 && (
+            <div style={{
+              padding: 32,
+              textAlign: 'center',
+              border: '1px dashed var(--border)',
+              borderRadius: 8,
+              color: 'var(--muted)',
+            }}>
+              No ledger events yet.
+            </div>
+          )}
+
+          {ledgerEvents.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {/* Table Header */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '140px 100px 70px 70px 140px 70px 100px',
+                gap: 8,
+                padding: '4px 12px',
+                color: 'var(--muted)',
+                fontSize: 11,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+              }}>
+                <span>Date</span>
+                <span>Type</span>
+                <span>Asset</span>
+                <span>League</span>
+                <span>Kickoff</span>
+                <span>Checkpoint</span>
+                <span style={{ textAlign: 'right' }}>Amount</span>
+              </div>
+
+              {/* Table Rows */}
+              {ledgerEvents.map(event => {
+                const date = new Date(event.createdAt)
+                const dateLabel = date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
+                const timeLabel = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                const isPositive = event.amount > 0
+
+                // Determine event type label
+                let typeLabel: string = event.reason
+                if (event.reason === 'tip') {
+                  typeLabel = isPositive ? 'tip (received)' : 'tip (sent)'
+                }
+
+                // Format kickoff if available
+                let kickoffLabel = '—'
+                if (event.kickoffAt) {
+                  const kickoffDate = new Date(event.kickoffAt)
+                  const kickoffDateStr = kickoffDate.toLocaleDateString([], { month: 'short', day: 'numeric' })
+                  const kickoffTimeStr = kickoffDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                  kickoffLabel = `${kickoffDateStr} · ${kickoffTimeStr}`
+                }
+
+                return (
+                  <div
+                    key={event.id}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '140px 100px 70px 70px 140px 70px 100px',
+                      gap: 8,
+                      padding: '10px 12px',
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 4,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                      {dateLabel} · {timeLabel}
+                    </span>
+                    <span style={{
+                      fontSize: 11,
+                      color: 'var(--text)',
+                      textTransform: 'capitalize',
+                      fontWeight: 500,
+                    }}>
+                      {typeLabel}
+                    </span>
+                    <span style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600 }}>
+                      {event.asset ?? '—'}
+                    </span>
+                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                      {event.mode ?? '—'}
+                    </span>
+                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                      {kickoffLabel}
+                    </span>
+                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                      {event.intervalLabel ?? '—'}
+                    </span>
+                    <span style={{
+                      textAlign: 'right',
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: isPositive ? 'var(--success-text)' : 'var(--error)',
+                    }}>
+                      {isPositive ? '+' : ''}{event.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 )

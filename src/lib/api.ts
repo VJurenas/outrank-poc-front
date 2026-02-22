@@ -90,6 +90,25 @@ export function getBalance(token: string): Promise<{ balance: number }> {
   return json('/auth/balance', { headers: { 'x-user-token': token } })
 }
 
+export type LedgerEvent = {
+  id: string
+  amount: number
+  reason: 'seed' | 'stake' | 'winnings' | 'refund' | 'tip'
+  gameSlug: string | null
+  asset: string | null
+  mode: string | null
+  kickoffAt: string | null
+  intervalLabel: string | null
+  createdAt: string
+}
+
+export function getLedger(token: string, params?: { limit?: number; since?: string }): Promise<{ events: LedgerEvent[] }> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.fromEntries(Object.entries(params).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]))
+  ).toString() : ''
+  return json(`/auth/ledger${qs}`, { headers: { 'x-user-token': token } })
+}
+
 export function updateProfile(token: string, alias: string): Promise<{ alias: string }> {
   return json('/auth/profile', {
     method: 'PUT',
