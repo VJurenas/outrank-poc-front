@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { getLedger, type LedgerEvent } from '../lib/api.ts'
 
@@ -185,6 +186,25 @@ export default function EventsBox() {
           )
         })}
       </div>
+      <Link
+        to="/performance?tab=events"
+        style={{
+          display: 'block',
+          padding: '10px 12px',
+          textAlign: 'center',
+          fontSize: 11,
+          fontWeight: 600,
+          color: 'var(--accent)',
+          textDecoration: 'none',
+          borderTop: '1px solid var(--border)',
+          background: 'var(--surface)',
+          transition: 'background 0.15s',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-bg)')}
+        onMouseLeave={e => (e.currentTarget.style.background = 'var(--surface)')}
+      >
+        All events →
+      </Link>
     </div>
   )
 }

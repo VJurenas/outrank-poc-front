@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { getPerformance, getGames, getLedger, api, type PerformanceGame, type GameInfo, type LedgerEvent } from '../lib/api.ts'
 import { AssetIcon } from '../components/Icons.tsx'
@@ -18,7 +18,13 @@ type ActiveGame = GameInfo & {
 export default function Performance() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<'portfolio' | 'history' | 'events'>('portfolio')
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Read initial tab from URL or default to 'portfolio'
+  const urlTab = searchParams.get('tab') as 'portfolio' | 'history' | 'events' | null
+  const initialTab = ['portfolio', 'history', 'events'].includes(urlTab ?? '') ? urlTab! : 'portfolio'
+  const [activeTab, setActiveTab] = useState<'portfolio' | 'history' | 'events'>(initialTab)
+
   const [historyGames, setHistoryGames] = useState<PerformanceGame[]>([])
   const [activeGames, setActiveGames] = useState<ActiveGame[]>([])
   const [ledgerEvents, setLedgerEvents] = useState<LedgerEvent[]>([])
@@ -42,6 +48,14 @@ export default function Performance() {
       .then(data => setLedgerEvents(data.events))
       .catch(console.error)
   }, [user])
+
+  // Sync activeTab with URL parameter changes
+  useEffect(() => {
+    const urlTab = searchParams.get('tab') as 'portfolio' | 'history' | 'events' | null
+    if (urlTab && ['portfolio', 'history', 'events'].includes(urlTab)) {
+      setActiveTab(urlTab)
+    }
+  }, [searchParams])
 
   // Fetch active games (lobby + live) and filter to user's games
   useEffect(() => {
@@ -166,7 +180,10 @@ export default function Performance() {
         {(['portfolio', 'history', 'events'] as const).map(tab => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => {
+              setActiveTab(tab)
+              setSearchParams({ tab })
+            }}
             style={{
               padding: '8px 20px',
               fontSize: 13,
