@@ -104,51 +104,103 @@ export default function Performance() {
     return () => clearInterval(interval)
   }, [])
 
-  // Fetch leaderboard data for live games
+  // Calculate ranks and zones for live games by fetching all predictions
   useEffect(() => {
     if (!user) return
 
-    // Use a ref to track current games without triggering re-renders
-    let currentGames: ActiveGame[] = []
-    const updateGamesRef = () => {
-      setActiveGames(prev => {
-        currentGames = prev
-        return prev
-      })
-    }
-
-    const fetchLeaderboards = async () => {
-      updateGamesRef()
-      const liveGames = currentGames.filter(g => g.status === 'live')
+    const calculateRanksAndZones = async () => {
+      const liveGames = activeGames.filter(g => g.status === 'live')
       if (liveGames.length === 0) return
 
-      // Fetch all leaderboards in parallel
+      // Fetch predictions for all live games in parallel
       const results = await Promise.all(
         liveGames.map(async game => {
           try {
-            const leaderboard = await api.getLeaderboard(game.slug)
-            const me = leaderboard.find(e => e.playerId === user.playerId)
-            return { slug: game.slug, data: me }
+            const predictions = await api.getPredictions(game.slug)
+            const currentPrice = prices[game.asset]
+
+            if (!currentPrice || predictions.length === 0) {
+              return { slug: game.slug, rank: null, zone: null, distance: null }
+            }
+
+            // Group predictions by alias (for 60min games with multiple predictions)
+            const playerDistances = new Map<string, number>()
+
+            for (const p of predictions) {
+              const distance = Math.abs(p.predicted_price - currentPrice)
+              if (playerDistances.has(p.alias)) {
+                // For 60min, average all checkpoint distances
+                playerDistances.set(p.alias, playerDistances.get(p.alias)! + distance)
+              } else {
+                playerDistances.set(p.alias, distance)
+              }
+            }
+
+            // Calculate average distance for 60min games
+            if (game.mode === '60min') {
+              for (const [alias, totalDist] of playerDistances) {
+                const count = predictions.filter(p => p.alias === alias).length
+                playerDistances.set(alias, totalDist / count)
+              }
+            }
+
+            // Sort players by distance (ascending)
+            const sorted = Array.from(playerDistances.entries())
+              .sort((a, b) => a[1] - b[1])
+
+            // Find user's position
+            const userIndex = sorted.findIndex(([alias]) => alias === user.alias)
+            if (userIndex === -1) {
+              return { slug: game.slug, rank: null, zone: null, distance: null }
+            }
+
+            const rank = userIndex + 1
+            const totalPlayers = sorted.length
+
+            // Calculate zone (top 40% gold, next 20% silver, bottom 40% dead)
+            const percentile = rank / totalPlayers
+            let zone: 'gold' | 'silver' | 'dead'
+            if (percentile <= 0.4) zone = 'gold'
+            else if (percentile <= 0.6) zone = 'silver'
+            else zone = 'dead'
+
+            // Get user's actual signed distance (prediction - price)
+            const userPredictions = predictions.filter(p => p.alias === user.alias)
+            let userDistance = 0
+            if (game.mode === '15min') {
+              userDistance = userPredictions[0].predicted_price - currentPrice
+            } else {
+              // For 60min, use average signed distance
+              userDistance = userPredictions.reduce((sum, p) => sum + (p.predicted_price - currentPrice), 0) / userPredictions.length
+            }
+
+            return { slug: game.slug, rank, zone, distance: userDistance, totalPlayers }
           } catch {
-            return { slug: game.slug, data: null }
+            return { slug: game.slug, rank: null, zone: null, distance: null }
           }
         })
       )
 
-      // Update state with all results at once
+      // Update state with calculated values
       setActiveGames(current => current.map(g => {
         const result = results.find(r => r.slug === g.slug)
-        if (result?.data) {
-          return { ...g, myRank: result.data.rank, myDistance: result.data.distance, myZone: result.data.zone }
+        if (result && result.rank !== null) {
+          return {
+            ...g,
+            myRank: result.rank,
+            myZone: result.zone!,
+            myDistance: result.distance!,
+            participant_count: result.totalPlayers,
+          }
         }
         return g
       }))
     }
 
-    fetchLeaderboards()
-    const interval = setInterval(fetchLeaderboards, 5_000)
+    calculateRanksAndZones()
+    const interval = setInterval(calculateRanksAndZones, 3_000)
     return () => clearInterval(interval)
-  }, [user])
+  }, [user, activeGames, prices])
 
   if (!user) return null
   if (loading) return <div style={{ padding: 32, color: 'var(--muted)' }}>Loading…</div>
@@ -249,12 +301,16 @@ export default function Performance() {
                 const dateLabel = kickoffDate.toLocaleDateString([], { month: 'short', day: 'numeric' })
                 const timeLabel = kickoffDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
-                // Calculate distance for lobby games
+                // Calculate distance (same logic for both lobby and live)
                 let distance: number | undefined = game.myDistance
-                if (game.status === 'lobby' && currentPrice && game.myPredictions?.length) {
-                  // For lobby, show distance to nearest prediction
-                  const dists = game.myPredictions.map(p => p.predictedPrice - currentPrice)
-                  distance = dists.reduce((a, b) => Math.abs(a) < Math.abs(b) ? a : b)
+                if (!distance && currentPrice && game.myPredictions?.length) {
+                  // Calculate signed distance (prediction - price)
+                  if (game.mode === '15min') {
+                    distance = game.myPredictions[0].predictedPrice - currentPrice
+                  } else {
+                    // For 60min, average all prediction distances
+                    distance = game.myPredictions.reduce((sum, p) => sum + (p.predictedPrice - currentPrice), 0) / game.myPredictions.length
+                  }
                 }
 
                 const zoneBorder = game.myZone ? ZONE_BORDERS[game.myZone] : 'var(--border)'
