@@ -62,6 +62,8 @@ export type PerformanceGame = {
   totalPlayers: number
   zone: 'gold' | 'silver' | 'dead'
   totalDistance: number
+  predictions?: { intervalLabel: string; predictedPrice: number }[]
+  finalPrice?: number | null
 }
 
 export function getPerformance(token: string): Promise<{ summary: PerformanceSummary; games: PerformanceGame[] }> {

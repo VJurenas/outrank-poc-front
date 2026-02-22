@@ -8,7 +8,7 @@ const ZONE_COLORS = { gold: 'var(--gold)', silver: 'var(--silver)', dead: 'var(-
 const ZONE_BORDERS = { gold: 'var(--zone-gold-border)', silver: 'var(--border)', dead: 'var(--border)' }
 
 type ActiveGame = GameInfo & {
-  myPredictions?: number[]
+  myPredictions?: { intervalLabel: string; predictedPrice: number }[]
   currentPrice?: number
   myRank?: number
   myDistance?: number
@@ -52,7 +52,7 @@ export default function Performance() {
         const preds = JSON.parse(localStorage.getItem(`predictions-${g.slug}`) ?? '[]') as { intervalLabel: string; predictedPrice: number }[]
         return {
           ...g,
-          myPredictions: preds.map(p => p.predictedPrice),
+          myPredictions: preds,
         }
       })
 
@@ -172,7 +172,7 @@ export default function Performance() {
               {/* Table Header */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '70px 70px 140px 70px 90px 120px 80px 100px',
+                gridTemplateColumns: '70px 70px 140px 70px 90px 140px 70px 80px 100px',
                 gap: 8,
                 padding: '4px 12px',
                 color: 'var(--muted)',
@@ -186,13 +186,14 @@ export default function Performance() {
                 <span>Status</span>
                 <span style={{ textAlign: 'right' }}>Price</span>
                 <span style={{ textAlign: 'right' }}>Predictions</span>
-                <span style={{ textAlign: 'right' }}>Rank</span>
+                <span style={{ textAlign: 'right' }}>Rank %</span>
+                <span style={{ textAlign: 'center' }}>Zone</span>
                 <span style={{ textAlign: 'right' }}>Distance</span>
               </div>
 
               {/* Table Rows */}
               {sortedActiveGames.map(game => {
-                const currentPrice = prices[game.asset.toLowerCase() + 'usdt']
+                const currentPrice = prices[game.asset]
                 const kickoffDate = new Date(game.kickoff_at)
                 const dateLabel = kickoffDate.toLocaleDateString([], { month: 'short', day: 'numeric' })
                 const timeLabel = kickoffDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -201,7 +202,7 @@ export default function Performance() {
                 let distance: number | undefined = game.myDistance
                 if (game.status === 'lobby' && currentPrice && game.myPredictions?.length) {
                   // For lobby, show distance to nearest prediction
-                  const dists = game.myPredictions.map(p => p - currentPrice)
+                  const dists = game.myPredictions.map(p => p.predictedPrice - currentPrice)
                   distance = dists.reduce((a, b) => Math.abs(a) < Math.abs(b) ? a : b)
                 }
 
@@ -216,7 +217,7 @@ export default function Performance() {
                     <div
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '70px 70px 140px 70px 90px 120px 80px 100px',
+                        gridTemplateColumns: '70px 70px 140px 70px 90px 140px 70px 80px 100px',
                         gap: 8,
                         padding: '10px 12px',
                         background: 'var(--surface)',
@@ -256,20 +257,36 @@ export default function Performance() {
                       <span style={{ textAlign: 'right', fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>
                         {currentPrice?.toLocaleString(undefined, { maximumFractionDigits: 2 }) ?? '—'}
                       </span>
-                      <span style={{ textAlign: 'right', fontSize: 12, color: 'var(--text)' }}>
-                        {game.myPredictions?.map(p => p.toLocaleString(undefined, { maximumFractionDigits: 0 })).join(', ') ?? '—'}
-                      </span>
-                      <span style={{ textAlign: 'right', fontSize: 13, color: 'var(--text)' }}>
-                        {game.myRank != null ? (
-                          <>
-                            <span style={{ fontWeight: 700 }}>#{game.myRank}</span>
-                            {game.myZone && (
-                              <span style={{ color: ZONE_COLORS[game.myZone], fontSize: 11, marginLeft: 4 }}>
-                                {Math.round((game.myRank / (game.participant_count || 1)) * 100)}%
-                              </span>
-                            )}
-                          </>
+                      {/* Predictions column - show with labels for 60min */}
+                      <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--text)' }}>
+                        {game.myPredictions && game.myPredictions.length > 0 ? (
+                          game.mode === '60min' ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                              {game.myPredictions.map(p => (
+                                <div key={p.intervalLabel} style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+                                  <span style={{ color: 'var(--muted)', fontSize: 9 }}>{p.intervalLabel}</span>
+                                  <span style={{ fontWeight: 600 }}>{p.predictedPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span style={{ fontWeight: 600, fontSize: 12 }}>
+                              {game.myPredictions[0].predictedPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          )
                         ) : '—'}
+                      </div>
+                      {/* Rank % column */}
+                      <span style={{ textAlign: 'right', fontSize: 13 }}>
+                        {game.myRank != null && game.participant_count ? (
+                          <span style={{ fontWeight: 700, color: game.myZone ? ZONE_COLORS[game.myZone] : 'var(--text)' }}>
+                            {Math.round((game.myRank / game.participant_count) * 100)}%
+                          </span>
+                        ) : '—'}
+                      </span>
+                      {/* Zone column */}
+                      <span style={{ textAlign: 'center', fontSize: 11, color: game.myZone ? ZONE_COLORS[game.myZone] : 'var(--muted)', textTransform: 'capitalize', fontWeight: 600 }}>
+                        {game.myZone ?? '—'}
                       </span>
                       <span style={{
                         textAlign: 'right',
@@ -310,7 +327,7 @@ export default function Performance() {
               {/* Table Header */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '70px 70px 140px 70px 90px 120px 80px 100px',
+                gridTemplateColumns: '70px 70px 140px 70px 90px 140px 70px 80px 100px',
                 gap: 8,
                 padding: '4px 12px',
                 color: 'var(--muted)',
@@ -324,7 +341,8 @@ export default function Performance() {
                 <span>Status</span>
                 <span style={{ textAlign: 'right' }}>Final Price</span>
                 <span style={{ textAlign: 'right' }}>Predictions</span>
-                <span style={{ textAlign: 'right' }}>Rank</span>
+                <span style={{ textAlign: 'right' }}>Rank %</span>
+                <span style={{ textAlign: 'center' }}>Zone</span>
                 <span style={{ textAlign: 'right' }}>Distance</span>
               </div>
 
@@ -336,12 +354,25 @@ export default function Performance() {
                 const dateLabel = kickoffDate.toLocaleDateString([], { month: 'short', day: 'numeric' })
                 const timeLabel = kickoffDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
+                // Calculate signed distance for each prediction
+                let distance: number | undefined
+                if (game.finalPrice != null && game.predictions && game.predictions.length > 0) {
+                  // For 15min: single prediction
+                  if (game.mode === '15min') {
+                    distance = game.predictions[0].predictedPrice - game.finalPrice
+                  } else {
+                    // For 60min: use average distance (same as backend totalDistance logic)
+                    const sum = game.predictions.reduce((acc, p) => acc + (p.predictedPrice - game.finalPrice!), 0)
+                    distance = sum / game.predictions.length
+                  }
+                }
+
                 return (
                   <div
                     key={game.slug}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '70px 70px 140px 70px 90px 120px 80px 100px',
+                      gridTemplateColumns: '70px 70px 140px 70px 90px 140px 70px 80px 100px',
                       gap: 8,
                       padding: '10px 12px',
                       background: 'var(--surface)',
@@ -364,20 +395,51 @@ export default function Performance() {
                     <span style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'capitalize' }}>
                       Ended
                     </span>
-                    <span style={{ textAlign: 'right', fontSize: 12, color: 'var(--muted)' }}>
-                      —
+                    {/* Final Price column */}
+                    <span style={{ textAlign: 'right', fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>
+                      {game.finalPrice != null
+                        ? game.finalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                        : '—'}
                     </span>
-                    <span style={{ textAlign: 'right', fontSize: 12, color: 'var(--muted)' }}>
-                      —
-                    </span>
+                    {/* Predictions column - show with labels for 60min */}
+                    <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--text)' }}>
+                      {game.predictions && game.predictions.length > 0 ? (
+                        game.mode === '60min' ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            {game.predictions.map(p => (
+                              <div key={p.intervalLabel} style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+                                <span style={{ color: 'var(--muted)', fontSize: 9 }}>{p.intervalLabel}</span>
+                                <span style={{ fontWeight: 600 }}>{p.predictedPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ fontWeight: 600, fontSize: 12 }}>
+                            {game.predictions[0].predictedPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        )
+                      ) : '—'}
+                    </div>
+                    {/* Rank % column */}
                     <span style={{ textAlign: 'right', fontSize: 13 }}>
-                      <span style={{ fontWeight: 700 }}>#{game.rank}</span>
-                      <span style={{ color: zoneColor, fontSize: 11, marginLeft: 4 }}>
+                      <span style={{ fontWeight: 700, color: zoneColor }}>
                         {Math.round((game.rank / game.totalPlayers) * 100)}%
                       </span>
                     </span>
-                    <span style={{ textAlign: 'right', fontSize: 12, color: 'var(--muted)' }}>
-                      {game.totalDistance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    {/* Zone column */}
+                    <span style={{ textAlign: 'center', fontSize: 11, color: zoneColor, textTransform: 'capitalize', fontWeight: 600 }}>
+                      {game.zone}
+                    </span>
+                    {/* Distance column with sign */}
+                    <span style={{
+                      textAlign: 'right',
+                      fontSize: 12,
+                      color: distance != null && distance > 0 ? 'var(--success-text)' : distance != null && distance < 0 ? 'var(--error)' : 'var(--muted)',
+                      fontWeight: 600,
+                    }}>
+                      {distance != null ? (
+                        `${distance > 0 ? '+' : ''}${distance.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                      ) : '—'}
                     </span>
                   </div>
                 )
