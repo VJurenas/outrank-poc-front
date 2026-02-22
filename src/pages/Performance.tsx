@@ -56,7 +56,14 @@ export default function Performance() {
         }
       })
 
-      setActiveGames(userGames)
+      // Merge with existing state to preserve leaderboard data (myRank, myDistance, myZone)
+      setActiveGames(prev => {
+        const prevMap = new Map(prev.map(p => [p.slug, p]))
+        return userGames.map(g => {
+          const existing = prevMap.get(g.slug)
+          return existing ? { ...g, myRank: existing.myRank, myDistance: existing.myDistance, myZone: existing.myZone } : g
+        })
+      })
     }
 
     fetchActive().catch(console.error)
@@ -77,30 +84,48 @@ export default function Performance() {
   // Fetch leaderboard data for live games
   useEffect(() => {
     if (!user) return
-    const fetchLeaderboards = async () => {
-      for (const game of activeGames.filter(g => g.status === 'live')) {
-        try {
-          const leaderboard = await api.getLeaderboard(game.slug)
-          const me = leaderboard.find(e => e.playerId === user.playerId)
-          if (me) {
-            setActiveGames(prev => prev.map(g =>
-              g.slug === game.slug
-                ? { ...g, myRank: me.rank, myDistance: me.distance, myZone: me.zone }
-                : g
-            ))
-          }
-        } catch {
-          // ignore
-        }
-      }
+
+    // Use a ref to track current games without triggering re-renders
+    let currentGames: ActiveGame[] = []
+    const updateGamesRef = () => {
+      setActiveGames(prev => {
+        currentGames = prev
+        return prev
+      })
     }
 
-    if (activeGames.some(g => g.status === 'live')) {
-      fetchLeaderboards()
-      const interval = setInterval(fetchLeaderboards, 5_000)
-      return () => clearInterval(interval)
+    const fetchLeaderboards = async () => {
+      updateGamesRef()
+      const liveGames = currentGames.filter(g => g.status === 'live')
+      if (liveGames.length === 0) return
+
+      // Fetch all leaderboards in parallel
+      const results = await Promise.all(
+        liveGames.map(async game => {
+          try {
+            const leaderboard = await api.getLeaderboard(game.slug)
+            const me = leaderboard.find(e => e.playerId === user.playerId)
+            return { slug: game.slug, data: me }
+          } catch {
+            return { slug: game.slug, data: null }
+          }
+        })
+      )
+
+      // Update state with all results at once
+      setActiveGames(current => current.map(g => {
+        const result = results.find(r => r.slug === g.slug)
+        if (result?.data) {
+          return { ...g, myRank: result.data.rank, myDistance: result.data.distance, myZone: result.data.zone }
+        }
+        return g
+      }))
     }
-  }, [activeGames, user])
+
+    fetchLeaderboards()
+    const interval = setInterval(fetchLeaderboards, 5_000)
+    return () => clearInterval(interval)
+  }, [user])
 
   if (!user) return null
   if (loading) return <div style={{ padding: 32, color: 'var(--muted)' }}>Loading…</div>
