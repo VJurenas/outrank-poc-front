@@ -451,6 +451,7 @@ export default function Lobby() {
                   type="number"
                   placeholder="Price (USD)"
                   value={predictions[label] ?? ''}
+                  step="0.01"
                   onFocus={() => setActiveLabel(label)}
                   onChange={e => setPredictions(prev => ({ ...prev, [label]: e.target.value }))}
                   style={{ flex: 1, borderColor: isActive ? 'var(--gold)' : undefined }}
