@@ -60,13 +60,17 @@ export default function Leagues() {
   const filterGames = (games: GameInfo[]) =>
     games.filter(g => selectedAssets.has(g.asset))
 
-  const live = filterGames(games.filter(g => g.status === 'live'))
-  // Sort upcoming ascending by kickoff time
-  const lobby = filterGames(
-    games
-      .filter(g => g.status === 'lobby')
-      .sort((a, b) => new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime())
-  )
+  // Sort by time (ascending), then by asset (ascending)
+  const sortGames = (games: GameInfo[]) =>
+    games.sort((a, b) => {
+      const timeA = new Date(a.kickoff_at).getTime()
+      const timeB = new Date(b.kickoff_at).getTime()
+      if (timeA !== timeB) return timeA - timeB
+      return a.asset.localeCompare(b.asset)
+    })
+
+  const live = sortGames(filterGames(games.filter(g => g.status === 'live')))
+  const lobby = sortGames(filterGames(games.filter(g => g.status === 'lobby')))
 
   const allSelected = selectedAssets.size === ASSETS.length
 

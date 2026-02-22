@@ -21,7 +21,7 @@ export default function Performance() {
   const [activeTab, setActiveTab] = useState<'portfolio' | 'history'>('portfolio')
   const [historyGames, setHistoryGames] = useState<PerformanceGame[]>([])
   const [activeGames, setActiveGames] = useState<ActiveGame[]>([])
-  const [prices, setPrices] = useState<Record<string, number>>({})
+  const [prices, setPrices] = useState<Record<string, number | null>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -106,6 +106,20 @@ export default function Performance() {
   if (loading) return <div style={{ padding: 32, color: 'var(--muted)' }}>Loading…</div>
   if (error) return <div style={{ padding: 32, color: 'var(--error)' }}>{error}</div>
 
+  // Sort active games: live at top, lobby at bottom; within each group sort by time + asset
+  const sortedActiveGames = [...activeGames].sort((a, b) => {
+    // Primary: status (live before lobby)
+    if (a.status !== b.status) {
+      return a.status === 'live' ? -1 : 1
+    }
+    // Secondary: kickoff time (ascending)
+    const timeA = new Date(a.kickoff_at).getTime()
+    const timeB = new Date(b.kickoff_at).getTime()
+    if (timeA !== timeB) return timeA - timeB
+    // Tertiary: asset (ascending)
+    return a.asset.localeCompare(b.asset)
+  })
+
   return (
     <div>
       <h1 style={{ margin: '0 0 6px', fontSize: 22 }}>Performance</h1>
@@ -177,7 +191,7 @@ export default function Performance() {
               </div>
 
               {/* Table Rows */}
-              {activeGames.map(game => {
+              {sortedActiveGames.map(game => {
                 const currentPrice = prices[game.asset.toLowerCase() + 'usdt']
                 const kickoffDate = new Date(game.kickoff_at)
                 const dateLabel = kickoffDate.toLocaleDateString([], { month: 'short', day: 'numeric' })
