@@ -260,11 +260,11 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
           const ss = d.getUTCSeconds().toString().padStart(2, '0')
           return `${hh}:${mm}:${ss}`
         },
-        rightOffset:                0,      // No offset, we control via setVisibleRange
+        rightOffset:                  750,    // 30 seconds × 25fps = 750 bars of empty space
         lockVisibleTimeRangeOnResize: true,
-        fixLeftEdge:                false,  // Allow programmatic range control
-        fixRightEdge:               false,  // Allow programmatic range control
-        minBarSpacing:              0.001,  // Allow extreme zoom-out to fit 7500+ points
+        fixLeftEdge:                  true,
+        fixRightEdge:                 false,
+        minBarSpacing:                0.001,  // Allow extreme zoom-out to fit 7500+ points
       },
       handleScroll: false,
       handleScale:  false,
@@ -274,7 +274,7 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
     const series = chart.addLineSeries({
       color:                  readVar('--chart-line'),
       lineWidth:              2,
-      lineType:               LineType.Curved,
+      lineType:               LineType.Simple,
       priceFormat:            { type: 'price', precision: 2, minMove: 0.01 },
       crosshairMarkerVisible: false,
     })
@@ -419,16 +419,7 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
         }
       }
 
-      // Update visible range at 25fps for smooth scrolling
-      try {
-        chart.timeScale().setVisibleRange({
-          from: (t - WINDOW_SECONDS) as UTCTimestamp,
-          to:   (t + LOOKAHEAD)      as UTCTimestamp,
-        })
-      } catch (e) {
-        // If setVisibleRange fails, try to fit content once
-        chart.timeScale().fitContent()
-      }
+      // The chart auto-scrolls with rightOffset=750 to show 30s lookahead
       updatePredictionLinePrices()
     }, TICK_MS)
 
@@ -455,22 +446,13 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
           priceBuffer = [{ time: Math.floor(last.time), price: last.price }]
         }
 
-        // Use requestAnimationFrame to ensure chart has processed the data before setting visible range
+        // Use requestAnimationFrame to ensure chart has processed the data
         requestAnimationFrame(() => {
           if (!chartRef.current) return
 
-          const t = Date.now() / 1000
-          const visibleFrom = t - WINDOW_SECONDS
-          const visibleTo = t + LOOKAHEAD
-
-          try {
-            chartRef.current.timeScale().setVisibleRange({
-              from: visibleFrom as UTCTimestamp,
-              to:   visibleTo as UTCTimestamp,
-            })
-          } catch (e) {
-            chartRef.current.timeScale().fitContent()
-          }
+          // Fit content and scroll to show rightmost data with 750-bar offset
+          chartRef.current.timeScale().fitContent()
+          chartRef.current.timeScale().scrollToRealTime()
 
           // Draw prediction lines after history is loaded so series is populated
           applyPredictionLines(predictionsRef.current)
