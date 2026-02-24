@@ -31,8 +31,8 @@ type Props = {
 }
 
 const WINDOW_SECONDS = 5 * 60   // 5-minute sliding window
-const LOOKAHEAD = 60             // right-side padding — one empty minute on the right
-const TICK_MS = 40               // 25 fps (redraws current 1-second bar smoothly)
+const LOOKAHEAD = 30             // right-side padding — 30 seconds ahead for smooth feel
+const TICK_MS = 40               // 25 fps (updates every 40ms for smooth sub-second animation)
 const TOP_EDGE_PX    = 3    // inset from top when clamping (no time-scale margin up here)
 const BOTTOM_EDGE_PX = 30   // inset from bottom — must clear the ~26px time-scale area
 
@@ -45,6 +45,47 @@ function zoneColor(zone?: 'gold' | 'silver' | 'dead'): string {
   if (zone === 'silver') return readVar('--silver')
   if (zone === 'dead') return readVar('--dead')
   return readVar('--chart-pred')
+}
+
+/**
+ * Catmull-Rom spline interpolation - same algorithm as backend.
+ * Given 4 control points and t ∈ [0, 1], returns interpolated value between p1 and p2.
+ */
+function catmullRom(p0: number, p1: number, p2: number, p3: number, t: number): number {
+  const t2 = t * t
+  const t3 = t2 * t
+  return 0.5 * (
+    2 * p1 +
+    (-p0 + p2) * t +
+    (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
+    (-p0 + 3 * p1 - 3 * p2 + p3) * t3
+  )
+}
+
+/**
+ * Interpolates between two prices over 1 second, returning 25 frames.
+ * Matches the backend interpolation algorithm for consistency.
+ */
+function interpolateLivePrice(
+  prevPrice: number,
+  currentPrice: number,
+  prevPrevPrice?: number,
+  nextPrice?: number
+): number[] {
+  const p0 = prevPrevPrice ?? prevPrice
+  const p1 = prevPrice
+  const p2 = currentPrice
+  const p3 = nextPrice ?? currentPrice
+
+  const frames: number[] = []
+  const FPS = 25
+
+  for (let i = 0; i < FPS; i++) {
+    const t = i / FPS
+    frames.push(catmullRom(p0, p1, p2, p3, t))
+  }
+
+  return frames
 }
 
 /** Converts hex color to rgba with specified opacity */
@@ -72,7 +113,8 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
   const seriesRef     = useRef<ISeriesApi<'Line'> | null>(null)
   const predLinesRef  = useRef<PredLine[]>([])
   const yZoomRef      = useRef(0)      // accumulated scroll steps; 0 = default margins
-  const zoomLabelRef  = useRef<HTMLDivElement>(null)
+  const zoomLabelRef  = useRef<HTMLDivElement | null>(null)
+  const pulseMarkerRef = useRef<HTMLDivElement | null>(null)
 
   // Refs used inside the animation loop to avoid stale closures
   const latestPriceRef  = useRef<number | undefined>(latestPrice)
@@ -218,8 +260,11 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
           const ss = d.getUTCSeconds().toString().padStart(2, '0')
           return `${hh}:${mm}:${ss}`
         },
-        rightOffset:                3,
+        rightOffset:                0,      // No offset, we control via setVisibleRange
         lockVisibleTimeRangeOnResize: true,
+        fixLeftEdge:                false,  // Allow programmatic range control
+        fixRightEdge:               false,  // Allow programmatic range control
+        minBarSpacing:              0.001,  // Allow extreme zoom-out to fit 7500+ points
       },
       handleScroll: false,
       handleScale:  false,
@@ -234,6 +279,32 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
       crosshairMarkerVisible: false,
     })
     seriesRef.current = series
+
+    // Create animated pulse marker at current price point
+    const pulseMarker = document.createElement('div')
+    pulseMarker.style.cssText = `
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: ${readVar('--chart-line')};
+      pointer-events: none;
+      z-index: 10;
+      animation: pulse 1.5s ease-in-out infinite;
+      box-shadow: 0 0 8px ${readVar('--chart-line')};
+    `
+    container.appendChild(pulseMarker)
+    pulseMarkerRef.current = pulseMarker
+
+    // Add CSS animation for pulse effect
+    const style = document.createElement('style')
+    style.textContent = `
+      @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.4; transform: scale(1.5); }
+      }
+    `
+    document.head.appendChild(style)
 
     // Convert click y-coordinate to price and forward to parent
     chart.subscribeClick((param) => {
@@ -269,65 +340,147 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
     container.addEventListener('wheel', onWheel, { passive: false })
     ;(container as HTMLElement & { _onWheel?: (e: WheelEvent) => void })._onWheel = onWheel
 
-    // Buffer to store live prices that arrive before history is loaded
+    // Live price buffering and interpolation for smooth 25fps updates
     let historyLoaded = false
-    let bufferedPrice: number | undefined
+    let lastHistoricalTime = 0  // Track last historical timestamp to avoid adding old data
+    let priceBuffer: Array<{ time: number; price: number }> = []  // Last 3 prices for interpolation
+    let interpolatedFrames: number[] = []  // Current 25-frame interpolation
+    let frameIndex = 0  // Current position in interpolated frames
+    let lastFrameUpdate = 0  // Timestamp when we last advanced the frame
+    let interpolationStartTime = 0  // When we started the current interpolation
 
-    // 25 fps animation loop.
-    // Series time is floored to whole seconds so data density matches the 1-pt/s history,
-    // keeping the x-axis uniformly spaced. Calling update() 25×/s with the same integer
-    // second just refreshes the current bar's value, giving smooth price animation.
+    // 25 fps animation loop with interpolated live prices for buttery-smooth updates
     const loopId = setInterval(() => {
       if (!seriesRef.current) return
 
-      // Buffer live prices until history is loaded
-      if (!historyLoaded) {
-        if (latestPriceRef.current !== undefined) {
-          bufferedPrice = latestPriceRef.current
-        }
-        return
-      }
-
-      if (latestPriceRef.current === undefined) return
+      if (!historyLoaded) return
 
       const nowMs = Date.now()
-      const t     = nowMs / 1000
-      const tSec  = Math.floor(t) as UTCTimestamp   // 1 bar/second — uniform with history
-      seriesRef.current.update({ time: tSec, value: latestPriceRef.current })
-      chart.timeScale().setVisibleRange({
-        from: (t - WINDOW_SECONDS) as UTCTimestamp,
-        to:   (t + LOOKAHEAD)      as UTCTimestamp,
-      })
+      const t = nowMs / 1000
+
+      // Check if a new price has arrived
+      if (latestPriceRef.current !== undefined) {
+        const currentPrice = latestPriceRef.current
+        const lastBuffered = priceBuffer[priceBuffer.length - 1]
+
+        // New price arrived - start new interpolation
+        if (!lastBuffered || lastBuffered.price !== currentPrice) {
+          const priceTime = Math.floor(t)
+
+          // Only add if this is AFTER historical data
+          if (priceTime > lastHistoricalTime) {
+            // Add to buffer (keep last 3 for smooth interpolation)
+            priceBuffer.push({ time: priceTime, price: currentPrice })
+            if (priceBuffer.length > 3) priceBuffer.shift()
+
+            // Generate 25 interpolated frames from previous to current price
+            if (priceBuffer.length >= 2) {
+              const n = priceBuffer.length
+              interpolatedFrames = interpolateLivePrice(
+                priceBuffer[n - 2].price,  // prev
+                priceBuffer[n - 1].price,  // current
+                n >= 3 ? priceBuffer[n - 3].price : undefined,  // prevPrev
+                undefined  // no future price yet
+              )
+              frameIndex = 0
+              lastFrameUpdate = nowMs
+              interpolationStartTime = priceBuffer[n - 2].time
+            }
+          }
+        }
+      }
+
+      // Advance to next interpolated frame every 40ms
+      if (interpolatedFrames.length > 0 && nowMs - lastFrameUpdate >= TICK_MS) {
+        frameIndex = Math.min(frameIndex + 1, interpolatedFrames.length - 1)
+        lastFrameUpdate = nowMs
+
+        const interpolatedPrice = interpolatedFrames[frameIndex]
+        // Calculate frame time: start from the beginning of the interpolation second + frame offset
+        const frameTime = (interpolationStartTime + frameIndex / 25) as UTCTimestamp
+
+        // Only add if newer than last historical data
+        if (frameTime > lastHistoricalTime) {
+          seriesRef.current.update({ time: frameTime, value: interpolatedPrice })
+          lastHistoricalTime = frameTime  // Update to prevent duplicate/old data
+
+          // Update pulse marker at interpolated position
+          if (pulseMarkerRef.current) {
+            const priceCoord = seriesRef.current.priceToCoordinate(interpolatedPrice)
+            const timeCoord = chart.timeScale().timeToCoordinate(frameTime)
+            if (priceCoord !== null && timeCoord !== null) {
+              pulseMarkerRef.current.style.left = `${timeCoord - 4}px`
+              pulseMarkerRef.current.style.top = `${priceCoord - 4}px`
+              pulseMarkerRef.current.style.display = 'block'
+            } else {
+              pulseMarkerRef.current.style.display = 'none'
+            }
+          }
+        }
+      }
+
+      // Update visible range at 25fps for smooth scrolling
+      try {
+        chart.timeScale().setVisibleRange({
+          from: (t - WINDOW_SECONDS) as UTCTimestamp,
+          to:   (t + LOOKAHEAD)      as UTCTimestamp,
+        })
+      } catch (e) {
+        // If setVisibleRange fails, try to fit content once
+        chart.timeScale().fitContent()
+      }
       updatePredictionLinePrices()
     }, TICK_MS)
 
-    // Load 5 min of history then set initial visible range and start animation
+    // Load 5 min of interpolated history (25fps data) then start animation
     fetch(`/api/prices/history/${asset}`)
       .then(r => r.json())
       .then((ticks: { time: number; price: number }[]) => {
         if (!seriesRef.current) return
-        for (const tick of ticks) {
-          seriesRef.current.update({ time: tick.time as UTCTimestamp, value: tick.price })
+
+
+        // Backend now returns interpolated data at 25fps with fractional timestamps
+        // Use setData instead of update to replace all data at once (handles React Strict Mode re-runs)
+        seriesRef.current.setData(
+          ticks.map(tick => ({
+            time: tick.time as UTCTimestamp,
+            value: tick.price
+          }))
+        )
+
+        // Initialize price buffer and track last historical timestamp
+        if (ticks.length > 0) {
+          const last = ticks[ticks.length - 1]
+          lastHistoricalTime = last.time  // Track the newest historical timestamp
+          priceBuffer = [{ time: Math.floor(last.time), price: last.price }]
         }
 
-        // If we buffered a live price while waiting, add it now
-        if (bufferedPrice !== undefined) {
-          const nowSec = Math.floor(Date.now() / 1000) as UTCTimestamp
-          seriesRef.current.update({ time: nowSec, value: bufferedPrice })
-        }
+        // Use requestAnimationFrame to ensure chart has processed the data before setting visible range
+        requestAnimationFrame(() => {
+          if (!chartRef.current) return
 
-        const t = Date.now() / 1000
-        chart.timeScale().setVisibleRange({
-          from: (Math.floor(t) - WINDOW_SECONDS) as UTCTimestamp,
-          to:   (Math.floor(t) + LOOKAHEAD)      as UTCTimestamp,
+          const t = Date.now() / 1000
+          const visibleFrom = t - WINDOW_SECONDS
+          const visibleTo = t + LOOKAHEAD
+
+          try {
+            chartRef.current.timeScale().setVisibleRange({
+              from: visibleFrom as UTCTimestamp,
+              to:   visibleTo as UTCTimestamp,
+            })
+          } catch (e) {
+            chartRef.current.timeScale().fitContent()
+          }
+
+          // Draw prediction lines after history is loaded so series is populated
+          applyPredictionLines(predictionsRef.current)
+
+          // Mark history as loaded - animation loop can now proceed
+          historyLoaded = true
         })
-        // Draw prediction lines after history is loaded so series is populated
-        applyPredictionLines(predictionsRef.current)
-
-        // Mark history as loaded - animation loop can now proceed
-        historyLoaded = true
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('Failed to load price history:', err)
         // Even if history load fails, allow animation loop to proceed
         historyLoaded = true
       })
@@ -342,6 +495,10 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
       ro.disconnect()
       const storedWheel = (container as HTMLElement & { _onWheel?: (e: WheelEvent) => void })._onWheel
       if (storedWheel) container.removeEventListener('wheel', storedWheel)
+      if (pulseMarkerRef.current) {
+        pulseMarkerRef.current.remove()
+        pulseMarkerRef.current = null
+      }
       chart.remove()
       chartRef.current  = null
       seriesRef.current = null
@@ -375,6 +532,14 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
         timeScale:       { borderColor: readVar('--chart-border') },
       })
       seriesRef.current.applyOptions({ color: readVar('--chart-line') })
+
+      // Update pulse marker color for theme
+      if (pulseMarkerRef.current) {
+        const lineColor = readVar('--chart-line')
+        pulseMarkerRef.current.style.background = lineColor
+        pulseMarkerRef.current.style.boxShadow = `0 0 8px ${lineColor}`
+      }
+
       applyPredictionLines(predictions)
     })
   }, [theme]) // eslint-disable-line react-hooks/exhaustive-deps
