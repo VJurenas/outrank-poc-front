@@ -31,7 +31,7 @@ type Props = {
 }
 
 const WINDOW_SECONDS = 5 * 60   // 5-minute sliding window
-const LOOKAHEAD = 30             // right-side padding — 30 seconds ahead for smooth feel
+const LOOKAHEAD_SECONDS = 30             // right-side padding — 30 seconds ahead for smooth feel
 const TICK_MS = 40               // 25 fps (updates every 40ms for smooth sub-second animation)
 const TOP_EDGE_PX    = 3    // inset from top when clamping (no time-scale margin up here)
 const BOTTOM_EDGE_PX = 30   // inset from bottom — must clear the ~26px time-scale area
@@ -340,16 +340,17 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
     container.addEventListener('wheel', onWheel, { passive: false })
     ;(container as HTMLElement & { _onWheel?: (e: WheelEvent) => void })._onWheel = onWheel
 
-    // Live price buffering and interpolation for smooth 25fps updates
+    // Live price buffering and interpolation - continuous streaming for smooth animation
     let historyLoaded = false
     let lastHistoricalTime = 0  // Track last historical timestamp to avoid adding old data
     let priceBuffer: Array<{ time: number; price: number }> = []  // Last 3 prices for interpolation
-    let interpolatedFrames: number[] = []  // Current 25-frame interpolation
-    let frameIndex = 0  // Current position in interpolated frames
-    let lastFrameUpdate = 0  // Timestamp when we last advanced the frame
-    let interpolationStartTime = 0  // When we started the current interpolation
+    let lastProcessedPrice: number | undefined  // Track last price we've interpolated
 
-    // 25 fps animation loop with interpolated live prices for buttery-smooth updates
+    // Frame queue for continuous streaming (one frame every 40ms)
+    type QueuedFrame = { time: UTCTimestamp; value: number }
+    let frameQueue: QueuedFrame[] = []
+
+    // 25 fps animation loop - stream one buffered frame at a time
     const loopId = setInterval(() => {
       if (!seriesRef.current) return
 
@@ -358,68 +359,68 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
       const nowMs = Date.now()
       const t = nowMs / 1000
 
-      // Check if a new price has arrived
-      if (latestPriceRef.current !== undefined) {
+      // When a new price arrives, generate interpolated frames and queue them
+      if (latestPriceRef.current !== undefined && latestPriceRef.current !== lastProcessedPrice) {
         const currentPrice = latestPriceRef.current
-        const lastBuffered = priceBuffer[priceBuffer.length - 1]
+        const priceTime = Math.floor(t)
 
-        // New price arrived - start new interpolation
-        if (!lastBuffered || lastBuffered.price !== currentPrice) {
-          const priceTime = Math.floor(t)
+        // Only process if this is AFTER historical data
+        if (priceTime > lastHistoricalTime) {
+          // Add to buffer (keep last 3 for smooth interpolation)
+          priceBuffer.push({ time: priceTime, price: currentPrice })
+          if (priceBuffer.length > 3) priceBuffer.shift()
 
-          // Only add if this is AFTER historical data
-          if (priceTime > lastHistoricalTime) {
-            // Add to buffer (keep last 3 for smooth interpolation)
-            priceBuffer.push({ time: priceTime, price: currentPrice })
-            if (priceBuffer.length > 3) priceBuffer.shift()
+          // Generate 25 interpolated frames and queue them for streaming
+          if (priceBuffer.length >= 2) {
+            const n = priceBuffer.length
+            const interpolatedFrames = interpolateLivePrice(
+              priceBuffer[n - 2].price,  // prev
+              priceBuffer[n - 1].price,  // current
+              n >= 3 ? priceBuffer[n - 3].price : undefined,  // prevPrev
+              undefined  // no future price yet
+            )
 
-            // Generate 25 interpolated frames from previous to current price
-            if (priceBuffer.length >= 2) {
-              const n = priceBuffer.length
-              interpolatedFrames = interpolateLivePrice(
-                priceBuffer[n - 2].price,  // prev
-                priceBuffer[n - 1].price,  // current
-                n >= 3 ? priceBuffer[n - 3].price : undefined,  // prevPrev
-                undefined  // no future price yet
-              )
-              frameIndex = 0
-              lastFrameUpdate = nowMs
-              interpolationStartTime = priceBuffer[n - 2].time
+            const interpolationStartTime = priceBuffer[n - 2].time
+
+            // Queue all 25 frames for gradual streaming (one per 40ms tick)
+            for (let i = 0; i < interpolatedFrames.length; i++) {
+              const frameTime = (interpolationStartTime + i / 25) as UTCTimestamp
+              if (frameTime > lastHistoricalTime) {
+                frameQueue.push({ time: frameTime, value: interpolatedFrames[i] })
+              }
             }
+          }
+
+          lastProcessedPrice = currentPrice
+        }
+      }
+
+      // Stream one frame per tick (40ms) for continuous smooth animation
+      if (frameQueue.length > 0) {
+        const frame = frameQueue.shift()!
+        seriesRef.current.update({ time: frame.time, value: frame.value })
+        lastHistoricalTime = frame.time
+
+        // Update pulse marker at the newly added frame
+        if (pulseMarkerRef.current) {
+          const priceCoord = seriesRef.current.priceToCoordinate(frame.value)
+          const timeCoord = chart.timeScale().timeToCoordinate(frame.time)
+          if (priceCoord !== null && timeCoord !== null) {
+            pulseMarkerRef.current.style.left = `${timeCoord - 4}px`
+            pulseMarkerRef.current.style.top = `${priceCoord - 4}px`
+            pulseMarkerRef.current.style.display = 'block'
+          } else {
+            pulseMarkerRef.current.style.display = 'none'
           }
         }
       }
 
-      // Advance to next interpolated frame every 40ms
-      if (interpolatedFrames.length > 0 && nowMs - lastFrameUpdate >= TICK_MS) {
-        frameIndex = Math.min(frameIndex + 1, interpolatedFrames.length - 1)
-        lastFrameUpdate = nowMs
+      // Smoothly scroll to show data + lookahead (now has data to show)
+      chart.timeScale().setVisibleRange({
+        from: (t - WINDOW_SECONDS) as UTCTimestamp,
+        to:   (t + LOOKAHEAD_SECONDS) as UTCTimestamp,
+      })
 
-        const interpolatedPrice = interpolatedFrames[frameIndex]
-        // Calculate frame time: start from the beginning of the interpolation second + frame offset
-        const frameTime = (interpolationStartTime + frameIndex / 25) as UTCTimestamp
-
-        // Only add if newer than last historical data
-        if (frameTime > lastHistoricalTime) {
-          seriesRef.current.update({ time: frameTime, value: interpolatedPrice })
-          lastHistoricalTime = frameTime  // Update to prevent duplicate/old data
-
-          // Update pulse marker at interpolated position
-          if (pulseMarkerRef.current) {
-            const priceCoord = seriesRef.current.priceToCoordinate(interpolatedPrice)
-            const timeCoord = chart.timeScale().timeToCoordinate(frameTime)
-            if (priceCoord !== null && timeCoord !== null) {
-              pulseMarkerRef.current.style.left = `${timeCoord - 4}px`
-              pulseMarkerRef.current.style.top = `${priceCoord - 4}px`
-              pulseMarkerRef.current.style.display = 'block'
-            } else {
-              pulseMarkerRef.current.style.display = 'none'
-            }
-          }
-        }
-      }
-
-      // The chart auto-scrolls with rightOffset=750 to show 30s lookahead
       updatePredictionLinePrices()
     }, TICK_MS)
 
