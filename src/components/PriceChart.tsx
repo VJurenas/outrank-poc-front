@@ -415,11 +415,15 @@ export default function PriceChart({ asset, latestPrice, predictions = [], heigh
         }
       }
 
-      // Smoothly scroll to show data + lookahead (now has data to show)
-      chart.timeScale().setVisibleRange({
-        from: (t - WINDOW_SECONDS) as UTCTimestamp,
-        to:   (t + LOOKAHEAD_SECONDS) as UTCTimestamp,
-      })
+      // Smoothly scroll to show data + lookahead
+      // Guard against empty series (e.g. when history fetch fails)
+      const visibleRange = chart.timeScale().getVisibleRange()
+      if (visibleRange !== null) {
+        chart.timeScale().setVisibleRange({
+          from: (t - WINDOW_SECONDS) as UTCTimestamp,
+          to:   (t + LOOKAHEAD_SECONDS) as UTCTimestamp,
+        })
+      }
 
       updatePredictionLinePrices()
     }, TICK_MS)
